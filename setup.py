@@ -1,7 +1,7 @@
 from setuptools import setup
 from glob import glob
 
-package_name = 'project'
+package_name = '133aproject'
 
 setup(
     name=package_name,
@@ -23,7 +23,7 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'pushup = project.pushup:main',
+            'pushup = 133aproject.pushup:main',
         ],
     },
 )
