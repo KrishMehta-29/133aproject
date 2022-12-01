@@ -31,15 +31,17 @@ class Trajectory():
     # Initialization.
     def __init__(self, node):
         # Set up the kinematic chain object.
+        
+        # Set up ALL the chains 
+        # TODO
         self.chain = KinematicChain(node, 'world', 'tip', self.jointnames())
 
-        # Define the various points.
-
-
         # Initialize the current joint position and chain data.
-        self.q = self.q0
+        # TODO Initialize all the chains 
+        
+        self.q = None # TODO Set this
         self.chain.setjoints(self.q)
-        self.qs = np.array([-np.pi/4, -np.pi/4, np.pi/2, -np.pi/2, 0, 0, 0])
+
 
         # Also zero the task error.
         self.err = np.zeros((6,1))
@@ -49,57 +51,17 @@ class Trajectory():
 
 
     # Declare the joint names.
-    def jointnames(self):
+    def jointnames(self, tip):
         # Return a list of joint names FOR THE EXPECTED URDF!
+        # TODO Implement better method to find the jointnames
         return ['theta1', 'theta2', 'theta3', 'theta4', 'theta5', 'theta6', 'theta7']
 
     # Evaluate at the given time.  This was last called (dt) ago.
     def evaluate(self, t, dt):
-        # Decide which phase we are in:
-        if t < 3:
-            # Approach movement:
-            (s0, s0dot) = spline(t, 3, 0, 1)
-
-            pd = np.array([0    , 0.95 - 0.25*np.cos(t), 0.60+0.25*np.cos(t)  ]).reshape((3,1))
-            vd = np.array([0 , 0.25*np.sin(t),     -0.25*np.cos(t)]).reshape((3,1))
-
-            Rd = Reye()
-            wd = np.zeros((3,1))
-
-        else:
-            # Cyclic (sinusoidal) movements, after the first 3s.
-            s    =               np.cos(np.pi/2.5 * (t-3))
-            sdot = - np.pi/2.5 * np.sin(np.pi/2.5 * (t-3))
-
-            # Use the path variables to compute the position trajectory.
-            pd = np.array([0    , 0.95 - 0.25*np.cos(t), 0.60+0.25*np.cos(t)  ]).reshape((3,1))
-            vd = np.array([0 , 0.25*np.sin(t),     -0.25*np.cos(t)]).reshape((3,1))
-
-            # Choose one of the following methods to compute orientation.
-            if False:
-                alpha    = - np.pi/4 * (s-1)
-                alphadot = - np.pi/4 * sdot
-
-                Rd = Rotx(-alpha) @ Roty(-alpha)
-                wd = (- ex() - Rotx(-alpha) @ ey()) * alphadot
-
-            elif False:
-                alpha    = - np.pi/4 * (s-1)
-                alphadot = - np.pi/4 * sdot
-                
-                Rd = Rotz(alpha) @ Rotx(-alpha)
-                wd = (ez() - Rotz(alpha) @ ex()) * alphadot
-
-            else:
-                alpha    = - np.pi/3 * (s-1)
-                alphadot = - np.pi/3 * sdot
-
-                eleft = np.array([1, 1, -1]).reshape((3,1)) / np.sqrt(3)
-                Rd    = Rote(eleft, -alpha)
-                wd    = - eleft * alphadot
-        Rd = np.identity(3)
-        # wd = np.array([0, 0, 0]).reshape((3,1))
-        # Grab the last joint value and task error.
+        # TODO
+        # Compute all the desired values for the pose and velocity for ALL the tips
+        
+        # TODO Do the Ikin
         q   = self.q
         err = self.err
 
