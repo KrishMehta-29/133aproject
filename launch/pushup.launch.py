@@ -68,13 +68,13 @@ def generate_launch_description():
         output     = 'screen',
         on_exit    = Shutdown())
 
-    # Configure a node for the pirouette demo.
-    #node_pushup = Node(
-    #    name       = 'pushup',
-    #    package    = '133aproject',
-    #    executable = 'pushup',
-    #    output     = 'screen',
-    #    on_exit    = Shutdown())
+     # Configure a node for the pirouette demo.
+    node_pushup = Node(
+        name       = 'pushup',
+        package    = '133aproject',
+        executable = 'pushup',
+        output     = 'screen',
+        on_exit    = Shutdown())
 
 
 
