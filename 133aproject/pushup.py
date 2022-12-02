@@ -23,6 +23,25 @@ def spline(t, T, p0, pf):
     v =      (pf-p0) * (6*t   /T**2 - 6*t**2/T**3)
     return (p, v)
 
+class Q:
+    def __init__(self, joint_names) -> None:
+        self.joint_names = joint_names
+        self.joint_values = dict([(joint_name, 0) for joint_name in joint_names])
+        
+    def setAll(self, value):
+        self.joint_values = dict([(joint_name, value) for joint_name in self.joint_names])
+
+    def setSome(self, joints, values):
+        for (i, joint) in enumerate(joints):
+            if (joint not in self.joint_values):
+                raise IndexError("Invalid Jointname pass into set")
+            self.joint_values[joint] = values[i]
+
+    def retSome(self, joints):
+        return np.array([self.joint_values[joint] for joint in joints])
+
+    def retAll(self):
+        return self.retSome(self.joint_names)
 
 #
 #   Trajectory Class
