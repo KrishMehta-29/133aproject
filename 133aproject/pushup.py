@@ -31,7 +31,6 @@ class Trajectory():
     # Initialization.
     def __init__(self, node):
         # Set up the kinematic chain object.
-        
         # Set up ALL the chains 
         # TODO
         
@@ -58,7 +57,7 @@ class Trajectory():
         self.chain_world_pelvis.setjoints(self.q_world)
 
         # Also zero the task error.
-        self.err = np.zeros((6,1))
+        self.err = np.zeros((15, 1))
 
         # Pick the convergence bandwidth.
         self.lam = 30
@@ -93,40 +92,43 @@ class Trajectory():
 
     # Evaluate at the given time.  This was last called (dt) ago.
     def evaluate(self, t, dt):
-        # TODO
-        # Compute all the desired values for the pose and velocity for ALL the tips
+    
+        # Cyclic (sinusoidal) movements, after the first 3s.
+        s    =               np.cos(np.pi/2.5 * (t-3))
+        sdot = - np.pi/2.5 * np.sin(np.pi/2.5 * (t-3))
+
+        # Use the path variables to compute the position trajectory.
+        pd = np.array([-0.3*s    , 0.5, 0.75-0.6*s**2  ]).reshape((3,1))
+        vd = np.array([-0.3*sdot , 0.0,     -1.2*s*sdot]).reshape((3,1))
         
-        """
-        # TODO Do the Ikin
-        q   = self.q
+        Rd = Reye()
+        wd = np.zeros((3,1))
+        
+        # Grab the last joint value and task error.
+        q   = self.q_arm
         err = self.err
 
         # Compute the inverse kinematics
-        J    = np.vstack((self.chain.Jv(),self.chain.Jw()))
-        weighted = np.linalg.inv((np.transpose(J) @ J + 1**2*np.eye(7))) @ np.transpose(J)
-        s = np.radians(np.array([0, 0, 0, -89, 0, 0, 0])).reshape((-1,1))
-        qdots = (np.identity(7)- weighted @ J) @ (0.05*(s - self.q))
+        J    = np.vstack((self.chain_left_arm.Jv(),self.chain_left_arm.Jw()))
         xdot = np.vstack((vd, wd))
-        qdot = weighted @ (xdot + self.lam * err) + qdots
+        qdot = np.linalg.inv(J) @ (xdot + self.lam * err)
+
         # Integrate the joint position and update the kin chain data.
         q = q + dt * qdot
-        self.chain.setjoints(q)
+        self.chain_left_arm.setjoints(q)
 
         # Compute the resulting task error (to be used next cycle).
-        err  = np.vstack((ep(pd, self.chain.ptip()), eR(Rd, self.chain.Rtip())))
+        err  = np.vstack((ep(pd, self.chain_left_arm.ptip()), eR(Rd, self.chain_left_arm.Rtip())))
 
         # Save the joint value and task error for the next cycle.
-        self.q   = q
+        self.q_arm   = q
         self.err = err
-        
-        # Return the position and velocity as python lists FOR EACH CHAIN.
-        return (q.flatten().tolist(), qdot.flatten().tolist())
-        
-        """
-        
+
+        # Return the position and velocity as python lists.
+        return (q.flatten().tolist(), qdot.flatten().tolist())       
         # test code
-        q = np.zeros(36).reshape(-1, 1)
-        return (q.flatten().tolist(), q.flatten().tolist())
+        # q = np.zeros(36).reshape(-1, 1)
+        # return (q.flatten().tolist(), q.flatten().tolist())
 
         
 
