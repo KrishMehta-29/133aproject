@@ -19,7 +19,7 @@ from hw5code.TransformHelpers  import *
 
 
 def spline(t, T, p0, pf):
-    p = p0 + (pf-p0) * (3*t**2/T**2 - 2*t**3/T**3)
+    p = p0 + (pf-p0) * (3*t**2/T**2 - 3*t**3/T**3)
     v =      (pf-p0) * (6*t   /T**2 - 6*t**2/T**3)
     return (p, v)
 
@@ -34,13 +34,28 @@ class Trajectory():
         
         # Set up ALL the chains 
         # TODO
-        self.chain = KinematicChain(node, 'world', 'tip', self.jointnames())
+        
+        self.chain_world_pelvis = KinematicChain(node, 'world', 'pelvis', self.jointnames('world_pelvis'))
+        
+        self.chain_left_arm = KinematicChain(node, 'world', 'l_lfarm', self.jointnames('left_arm'))
+        self.chain_right_arm = KinematicChain(node, 'world', 'r_lfarm', self.jointnames('right_arm'))
+        self.chain_left_leg = KinematicChain(node, 'world', 'l_foot', self.jointnames('left_leg'))
+        self.chain_right_leg = KinematicChain(node, 'world', 'r_foot', self.jointnames('right_leg'))
+        
 
         # Initialize the current joint position and chain data.
         # TODO Initialize all the chains 
         
-        self.q = None # TODO Set this
-        self.chain.setjoints(self.q)
+        self.q_arm = np.zeros(15).reshape(-1,1) # TODO Set this
+        self.q_leg = np.zeros(12).reshape(-1,1)
+        self.q_world = np.zeros(6).reshape(-1,1)
+        
+        self.chain_left_arm.setjoints(self.q_arm)
+        self.chain_right_arm.setjoints(self.q_arm)
+        self.chain_left_leg.setjoints(self.q_leg)
+        self.chain_right_leg.setjoints(self.q_leg)
+        
+        self.chain_world_pelvis.setjoints(self.q_world)
 
         # Also zero the task error.
         self.err = np.zeros((6,1))
@@ -50,16 +65,38 @@ class Trajectory():
 
 
     # Declare the joint names.
-    def jointnames(self, tip):
+    def jointnames(self, which_chain='all'):
         # Return a list of joint names FOR THE EXPECTED URDF!
         # TODO Implement better method to find the jointnames
-        return ['theta1', 'theta2', 'theta3', 'theta4', 'theta5', 'theta6', 'theta7']
+        
+        joints = {
+        
+        'left_arm':['back_bkz', 'back_bky', 'back_bkx', 'l_arm_shz','l_arm_shx', 'l_arm_ely', 'l_arm_elx', 'l_arm_wry', 'l_arm_wrx'],
+        
+         'right_arm': ['back_bkz', 'back_bky', 'back_bkx', 'r_arm_shz','r_arm_shx', 'r_arm_ely', 'r_arm_elx', 'r_arm_wry', 'r_arm_wrx'],
+         
+         'left_leg': ['l_leg_hpz', 'l_leg_hpx', 'l_leg_hpy', 'l_leg_kny', 'l_leg_aky', 'l_leg_akx'] , 
+         
+         'right_leg':['r_leg_hpz', 'r_leg_hpx', 'r_leg_hpy', 'r_leg_kny', 'r_leg_aky', 'r_leg_akx'], 
+         
+         'world_pelvis':['mov_x', 'mov_y', 'mov_z', 'rotate_x', 'rotate_y', 'rotate_z']
+         
+        }
+         
+        if which_chain == 'all':
+            return joints['world_pelvis'] + joints['left_arm'] + joints['right_arm'] + joints['left_leg'] + joints['right_leg']
+         
+        if which_chain == 'world_pelvis':
+            return joints['world_pelvis']
+             
+        return joints['world_pelvis'] + joints[which_chain]
 
     # Evaluate at the given time.  This was last called (dt) ago.
     def evaluate(self, t, dt):
         # TODO
         # Compute all the desired values for the pose and velocity for ALL the tips
         
+        """
         # TODO Do the Ikin
         q   = self.q
         err = self.err
@@ -81,9 +118,17 @@ class Trajectory():
         # Save the joint value and task error for the next cycle.
         self.q   = q
         self.err = err
-
-        # Return the position and velocity as python lists.
+        
+        # Return the position and velocity as python lists FOR EACH CHAIN.
         return (q.flatten().tolist(), qdot.flatten().tolist())
+        
+        """
+        
+        # test code
+        q = np.zeros(36).reshape(-1, 1)
+        return (q.flatten().tolist(), q.flatten().tolist())
+
+        
 
 
 #
@@ -103,3 +148,4 @@ def main(args=None):
 
 if __name__ == "__main__":
     main()
+
