@@ -32,6 +32,7 @@ class Q:
         self.joint_values = dict([(joint_name, value) for joint_name in self.joint_names])
 
     def setSome(self, joints, values):
+        values=values.flatten()
         for (i, joint) in enumerate(joints):
             if (joint not in self.joint_values):
                 raise IndexError("Invalid Jointname pass into set")
@@ -86,8 +87,11 @@ class Trajectory():
         # TODO Initialize all the chains 
 
         self.Q = Q(self.jointnames())
+        self.Qdot = Q(self.jointnames())
+        
+        self.Qdot.setAll(0)
         self.Q.setAll(0)
-        self.Q.setSome(['r_arm_shx', 'l_arm_shx', 'r_arm_shz', 'l_arm_shz', 'rotate_y', 'mov_z'], [0.25, -0.25, np.pi/2, -np.pi/2, 0.95, 0.51])
+        self.Q.setSome(['r_arm_shx', 'l_arm_shx', 'r_arm_shz', 'l_arm_shz', 'rotate_y', 'mov_z'], np.array([0.25, -0.25, np.pi/2, -np.pi/2, 0.95, 0.51]))
         
         self.chain_left_arm.setjoints(self.Q.retSome(self.jointnames('left_arm')))
         self.chain_right_arm.setjoints(self.Q.retSome(self.jointnames('right_arm')))
@@ -97,7 +101,7 @@ class Trajectory():
         self.chain_world_pelvis.setjoints(self.Q.retSome(self.jointnames('world_pelvis')))
 
         # Also zero the task error.
-        self.err = np.zeros((15, 1))
+        self.err = np.zeros((6, 1))
 
         # Pick the convergence bandwidth.
         self.lam = 30
@@ -145,31 +149,34 @@ class Trajectory():
         wd = np.zeros((3,1))
         
         # Grab the last joint value and task error.
-        q   = self.q_arm
+        q   = self.Q.retSome(self.jointnames('left_arm'))
         err = self.err
 
         # Compute the inverse kinematics
         J    = np.vstack((self.chain_left_arm.Jv(),self.chain_left_arm.Jw()))
         xdot = np.vstack((vd, wd))
-        qdot = np.linalg.inv(J) @ (xdot + self.lam * err)
+        qdot = np.linalg.pinv(J) @ (xdot + self.lam * err)
 
         # Integrate the joint position and update the kin chain data.
         q = q + dt * qdot
         self.chain_left_arm.setjoints(q)
+        self.Q.setSome(self.jointnames('left_arm'), q)
+        self.Qdot.setSome(self.jointnames('left_arm'), qdot)
 
         # Compute the resulting task error (to be used next cycle).
         err  = np.vstack((ep(pd, self.chain_left_arm.ptip()), eR(Rd, self.chain_left_arm.Rtip())))
 
         # Save the joint value and task error for the next cycle.
-        self.q_arm   = q
         self.err = err
 
         # Return the position and velocity as python lists.
         # return (q.flatten().tolist(), qdot.flatten().tolist())       
         # test code
-        q = self.Q.retAll()
-        qvel = np.zeros(36).reshape((-1, 1))
-        return (q.flatten().tolist(), qvel.flatten().tolist())
+        q_all = self.Q.retAll()
+        print(q_all)
+        qdot_all = self.Qdot.retAll()
+        print(qdot_all)
+        return (q_all.flatten().tolist(), qdot_all.flatten().tolist())
 
         
 
