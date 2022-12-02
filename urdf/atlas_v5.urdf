@@ -816,54 +816,54 @@
     <limit effort="890" lower="0" upper="2.35637" velocity="12"/>
     <safety_controller k_position="100" k_velocity="100" soft_lower_limit="-10" soft_upper_limit="12.3564"/>
   </joint>
-  <joint name="wtrx" type="continuous">
+  <joint name="mov_x" type="prismatic">
     <origin rpy="0 0 0" xyz="0 0 0"/>
     <axis xyz="1 0 0"/>
     <parent link="world"/>
-    <child link="rot_x"/>
-  </joint>
-  <joint name="rxtry" type="continuous">
-    <origin rpy="0 0 0" xyz="0 0 0"/>
-    <axis xyz="0 1 0"/>
-    <parent link="rot_x"/>
-    <child link="rot_y"/>
-    <limit effort="890" lower="0" upper="2.35637" velocity="12"/>
-  </joint>
-  <joint name="rytrz" type="continuous">
-    <origin rpy="0 0 0" xyz="0 0 0"/>
-    <axis xyz="0 0 1"/>
-    <parent link="rot_y"/>
-    <child link="rot_z"/>
-    <limit effort="890" lower="0" upper="2.35637" velocity="12"/>
-  </joint>
-  <joint name="rztpx" type="prismatic">
-    <origin rpy="0 0 0" xyz="0 0 0"/>
-    <axis xyz="1 0 0"/>
-    <parent link="rot_z"/>
     <child link="pris_x"/>
     <limit effort="890" lower="0" upper="2.35637" velocity="12"/>
   </joint>
-  <joint name="pxtpy" type="prismatic">
+  <joint name="mov_y" type="prismatic">
     <origin rpy="0 0 0" xyz="0 0 0"/>
     <axis xyz="0 1 0"/>
     <parent link="pris_x"/>
     <child link="pris_y"/>
     <limit effort="890" lower="0" upper="2.35637" velocity="12"/>
   </joint>
-  <joint name="pytpz" type="prismatic">
+  <joint name="mov_z" type="prismatic">
     <origin rpy="0 0 0" xyz="0 0 0"/>
     <axis xyz="0 0 1"/>
     <parent link="pris_y"/>
     <child link="pris_z"/>
     <limit effort="890" lower="0" upper="2.35637" velocity="12"/>
   </joint>  
-  <joint name="pZtp" type="fixed">
+  <joint name="rotate_x" type="continuous">
+    <origin rpy="0 0 0" xyz="0 0 0"/>
+    <axis xyz="1 0 0"/>
+    <parent link="pris_z"/>
+    <child link="rot_x"/>
+    <limit effort="890" lower="0" upper="2.35637" velocity="12"/>
+  </joint>
+  <joint name="rotate_y" type="continuous">
+    <origin rpy="0 0 0" xyz="0 0 0"/>
+    <axis xyz="0 1 0"/>
+    <parent link="rot_x"/>
+    <child link="rot_y"/>
+    <limit effort="890" lower="0" upper="2.35637" velocity="12"/>
+  </joint>
+  <joint name="rotate_z" type="continuous">
+    <origin rpy="0 0 0" xyz="0 0 0"/>
+    <axis xyz="0 0 1"/>
+    <parent link="rot_y"/>
+    <child link="rot_z"/>
+    <limit effort="890" lower="0" upper="2.35637" velocity="12"/>
+  </joint>  
+  <joint name="con_to_pel" type="fixed">
     <origin rpy="0 0 0" xyz="0 0 0"/>
     <axis xyz="0 0 0"/>
-    <parent link="pris_z"/>
+    <parent link="rot_z"/>
     <child link="pelvis"/>
-    <limit effort="890" lower="0" upper="2.35637" velocity="12"/>
-  </joint> 
+  </joint>
   <link name="r_situational_awareness_camera_link">
     <inertial>
       <mass value="0.1"/>
