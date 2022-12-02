@@ -38,10 +38,33 @@ class Q:
             self.joint_values[joint] = values[i]
 
     def retSome(self, joints):
-        return np.array([self.joint_values[joint] for joint in joints])
+        return np.array([self.joint_values[joint] for joint in joints]).reshape((-1, 1))
 
     def retAll(self):
         return self.retSome(self.joint_names)
+
+class Jacobian():
+    def __init__(self, joints, JP, JR) -> None:
+        J = np.vstack(JP, JR)
+        self.Jacobian = J
+        self.joints = joints
+        self.columns = dict([(joint, J[i, :]) for (i, joint) in enumerate(self.joints)])
+
+    def merge(Js, joints):
+        columns = len(joints)
+        rows = sum([J.Jacobian.shape[0] for J in Js])
+        mergedJ = np.zeros((rows, columns))
+
+        rowInput = 0
+        for J in Js:
+            size = J.Jacobian.shape[0]
+            for (columnNo, joint) in enumerate(joints):
+                if joint in J.columns:
+                    mergedJ[rowInput:rowInput + size, columnNo] = J.columns[joint]
+                
+            rowInput += size
+                
+        return mergedJ
 
 #
 #   Trajectory Class
@@ -50,9 +73,6 @@ class Trajectory():
     # Initialization.
     def __init__(self, node):
         # Set up the kinematic chain object.
-        
-        # Set up ALL the chains 
-        # TODO
         
         self.chain_world_pelvis = KinematicChain(node, 'world', 'pelvis', self.jointnames('world_pelvis'))
         
@@ -64,17 +84,17 @@ class Trajectory():
 
         # Initialize the current joint position and chain data.
         # TODO Initialize all the chains 
+
+        self.Q = Q(self.jointnames())
+        self.Q.setAll(0)
+        self.Q.setSome(['r_arm_shx', 'l_arm_shx', 'r_arm_shz', 'l_arm_shz', 'rotate_y', 'mov_z'], [0.25, -0.25, np.pi/2, -np.pi/2, 0.95, 0.51])
         
-        self.q_arm = np.zeros(15).reshape(-1,1) # TODO Set this
-        self.q_leg = np.zeros(12).reshape(-1,1)
-        self.q_world = np.zeros(6).reshape(-1,1)
+        self.chain_left_arm.setjoints(self.Q.retSome(self.jointnames('left_arm')))
+        self.chain_right_arm.setjoints(self.Q.retSome(self.jointnames('right_arm')))
+        self.chain_left_leg.setjoints(self.Q.retSome(self.jointnames('left_leg')))
+        self.chain_right_leg.setjoints(self.Q.retSome(self.jointnames('right_leg')))
         
-        self.chain_left_arm.setjoints(self.q_arm)
-        self.chain_right_arm.setjoints(self.q_arm)
-        self.chain_left_leg.setjoints(self.q_leg)
-        self.chain_right_leg.setjoints(self.q_leg)
-        
-        self.chain_world_pelvis.setjoints(self.q_world)
+        self.chain_world_pelvis.setjoints(self.Q.retSome(self.jointnames('world_pelvis')))
 
         # Also zero the task error.
         self.err = np.zeros((6,1))
@@ -103,7 +123,7 @@ class Trajectory():
         }
          
         if which_chain == 'all':
-            return joints['world_pelvis'] + joints['left_arm'] + joints['right_arm'] + joints['left_leg'] + joints['right_leg']
+            return joints['world_pelvis'] + joints['left_arm'] + joints['right_arm'][3:] + joints['left_leg'] + joints['right_leg']
          
         if which_chain == 'world_pelvis':
             return joints['world_pelvis']
@@ -144,8 +164,9 @@ class Trajectory():
         """
         
         # test code
-        q = np.zeros(36).reshape(-1, 1)
-        return (q.flatten().tolist(), q.flatten().tolist())
+        q = self.Q.retAll()
+        qvel = np.zeros(36).reshape((-1, 1))
+        return (q.flatten().tolist(), qvel.flatten().tolist())
 
         
 
