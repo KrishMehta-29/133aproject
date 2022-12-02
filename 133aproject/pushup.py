@@ -42,7 +42,6 @@ class Trajectory():
         self.q = None # TODO Set this
         self.chain.setjoints(self.q)
 
-
         # Also zero the task error.
         self.err = np.zeros((6,1))
 

@@ -32,10 +32,10 @@ def generate_launch_description():
     # LOCATE FILES
 
     # Locate the RVIZ configuration file.
-    rvizcfg = os.path.join(pkgdir('ungrounded'), 'rviz/viewurdf.rviz')
+    rvizcfg = os.path.join(pkgdir('133aproject'), 'rviz/viewurdf.rviz')
 
     # Locate/load the robot's URDF file (XML).
-    urdf = os.path.join(pkgdir('atlas_description'), 'urdf/atlas_v5.urdf')
+    urdf = os.path.join(pkgdir('133aproject'), 'urdf/atlas_v5.urdf')
     with open(urdf, 'r') as file:
         robot_description = file.read()
 
