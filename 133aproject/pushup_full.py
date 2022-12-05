@@ -101,7 +101,7 @@ class Trajectory():
         self.chain_world_pelvis.setjoints(self.Q.retSome(self.jointnames('world_pelvis')))
 
         # Also zero the task error.
-        self.err = np.zeros((6, 1))
+        self.err = np.zeros((24, 1))
 
         # Pick the convergence bandwidth.
         self.lam = 30
@@ -153,9 +153,22 @@ class Trajectory():
         err = self.err
 
         # Compute the inverse kinematics
-        J    = np.vstack((self.chain_left_arm.Jv(), self.chain_left_arm.Jw()))
-        xdot = np.vstack((vd, wd))
-        qdot = np.linalg.pinv(J) @ (xdot + self.lam * err)
+        J_left_arm    = np.vstack((self.chain_left_arm.Jv(), self.chain_left_arm.Jw()))
+        J_right_arm   = np.vstack((self.chain_right_arm.Jv(), self.chain_right_arm.Jw()))
+        J_left_leg    = np.vstack((self.chain_left_leg.Jv(), self.chain_left_leg.Jw()))
+        J_right_leg   = np.vstack((self.chain_right_leg.Jv(), self.chain_right_leg.Jw()))
+        
+        big_J = np.zeros(24, 27)
+        big_J[0:6, 0:9] = J_left_arm
+        big_J[6:12, 9:15] = J_right_arm[:, -6:]
+        big_J[12:18, 15:21] = J_left_leg[:, -6:]
+        big_J[18:24, 21:27] = J_right_leg[:, -6:]
+        
+        print(big_J)
+        # 6 more rows for going up and down
+                        
+        xdot = np.vstack(np.vstack((vd, wd)), np.zeros(18)) # make it 24
+        qdot = np.linalg.pinv(big_J) @ (xdot + self.lam * err) # returns 27
 
         # Integrate the joint position and update the kin chain data.
         q = q + dt * qdot
