@@ -76,6 +76,20 @@ class Jacobian():
                 
         return mergedJ
 
+class X():
+    def __init__(self, chains) -> None:
+        # Chains should just be a dictionary of chains
+        self.chains = chains
+
+    def calculateError(self, desiredValues):
+        # desiredValues = [(chain1p, chain1r), (chain2p, chain2r), ...]
+        
+        tipPoses = [(self.chains[i].ptip(), self.chains[i].rtip()) for (i, (desP, desR)) in enumerate(desiredValues)]
+        errors = [(ep(tipP, desP), eR(tipR, desR)) for ((tipP, tipR), (desP, desR)) in zip(tipPoses, desiredValues)]
+        
+        flatErrors = [item for sublist in errors for item in sublist]
+        return np.vstack(tuple(flatErrors))
+
 #
 #   Trajectory Class
 #
@@ -199,8 +213,8 @@ class Trajectory():
         
 
         # Compute the resulting task error (to be used next cycle).
-        err  = np.vstack((ep(pd, self.chain_left_arm.ptip()), eR(Rd, self.chain_left_arm.Rtip())))
-
+        # err  = np.vstack((ep(pd, self.chain_left_arm.ptip()), eR(Rd, self.chain_left_arm.Rtip())))
+        err = np.zeros((24, 1))
         # Save the joint value and task error for the next cycle.
         self.err = err
 
@@ -214,8 +228,8 @@ class Trajectory():
         self.Q2 = Q(self.jointnames())
         self.Qdot2 = Q(self.jointnames())
         
-        self.Qdot2.setAll(0)
-        self.Q2.setAll(0)
+        self.Qdot2.setAll(0.0)
+        self.Q2.setAll(0.0)
         self.Q2.setSome(['r_arm_shx', 'l_arm_shx', 'r_arm_shz', 'l_arm_shz', 'rotate_y', 'mov_z'], np.array([0.25, -0.25, np.pi/2, -np.pi/2, 0.95, 0.51]))
         
         q_all = self.Q2.retAll()
