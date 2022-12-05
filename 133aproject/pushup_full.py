@@ -32,9 +32,7 @@ class Q:
         self.joint_values = dict([(joint_name, value) for joint_name in self.joint_names])
 
     def setSome(self, joints, values):
-        if isinstance(values, np.ndarray):
-            values = values.flatten()
-
+        values=values.flatten()
         for (i, joint) in enumerate(joints):
             if (joint not in self.joint_values):
                 raise IndexError("Invalid Jointname pass into set")
@@ -46,19 +44,12 @@ class Q:
     def retAll(self):
         return self.retSome(self.joint_names)
 
-    def __len__(self):
-        return len(self.joint_names)
-
 class Jacobian():
-    def __init__(self, joints, chain) -> None:
-
-        Jv = chain.Jv()
-        Jw = chain.Jw()
-        J = np.vstack((Jv, Jw))
-        print("Jacobian Shape", J.shape, "Length", len(joints))
+    def __init__(self, joints, JP, JR) -> None:
+        J = np.vstack(JP, JR)
         self.Jacobian = J
         self.joints = joints
-        self.columns = dict([(joint, J[:, i]) for (i, joint) in enumerate(self.joints)])
+        self.columns = dict([(joint, J[i, :]) for (i, joint) in enumerate(self.joints)])
 
     def merge(Js, joints):
         columns = len(joints)
@@ -153,50 +144,37 @@ class Trajectory():
         # Use the path variables to compute the position trajectory.
         pd = np.array([-0.3*s    , 0.5, 0.75-0.6*s**2  ]).reshape((3,1))
         vd = np.array([-0.3*sdot , 0.0,     -1.2*s*sdot]).reshape((3,1))
-
-        pd = np.zeros((len(self.Q), 1))
-        vd = np.zeros((len(self.Q), 1))
         
         Rd = Reye()
         wd = np.zeros((3,1))
         
         # Grab the last joint value and task error.
-        
-        q = self.Q.retAll()
+        q   = self.Q.retSome(self.jointnames('left_arm'))
         err = self.err
-        
+
         # Compute the inverse kinematics
-
-        J_left_arm = Jacobian(self.jointnames('left_arm'), self.chain_left_arm)
-        J_right_arm = Jacobian(self.jointnames('right_arm'), self.chain_right_arm)
-        J_left_leg = Jacobian(self.jointnames('left_leg'), self.chain_left_leg)
-        J_right_leg = Jacobian(self.jointnames('right_leg'), self.chain_left_leg)
-        JMerged = Jacobian.merge([J_left_arm, J_right_arm, J_left_leg, J_right_leg], self.jointnames())
-
-        print(f"JMerged Shape: {JMerged.shape}")
-
-        # TODO
-        xdot = np.zeros((24, 1))
-        print(f"xdot {xdot.shape}, error {err.shape}" )
-
-        qdot = np.linalg.pinv(JMerged) @ (xdot + self.lam * err)
+        J_left_arm    = np.vstack((self.chain_left_arm.Jv(), self.chain_left_arm.Jw()))
+        J_right_arm   = np.vstack((self.chain_right_arm.Jv(), self.chain_right_arm.Jw()))
+        J_left_leg    = np.vstack((self.chain_left_leg.Jv(), self.chain_left_leg.Jw()))
+        J_right_leg   = np.vstack((self.chain_right_leg.Jv(), self.chain_right_leg.Jw()))
+        
+        big_J = np.zeros((24, 27))
+        big_J[0:6, 0:9] = J_left_arm
+        big_J[6:12, 9:15] = J_right_arm[:, -6:]
+        big_J[12:18, 15:21] = J_left_leg[:, -6:]
+        big_J[18:24, 21:27] = J_right_leg[:, -6:]
+        
+        print(big_J)
+        # 6 more rows for going up and down
+                        
+        xdot = np.vstack(np.vstack((vd, wd)), np.zeros(18)) # make it 24
+        qdot = np.linalg.pinv(big_J) @ (xdot + self.lam * err) # returns 27
 
         # Integrate the joint position and update the kin chain data.
         q = q + dt * qdot
-        
-        print(q.shape)
-        print(len(self.Q))
-
-        self.Q.setSome(self.jointnames(), q)
-        self.Qdot.setAll(qdot)
-
-        print(self.Q.retSome(self.jointnames('left_arm')).shape)
-
-        self.chain_left_arm.setjoints(self.Q.retSome(self.jointnames('left_arm')))
-        self.chain_right_arm.setjoints(self.Q.retSome(self.jointnames('right_arm')))
-        self.chain_left_leg.setjoints(self.Q.retSome(self.jointnames('left_leg')))
-        self.chain_right_leg.setjoints(self.Q.retSome(self.jointnames('right_leg')))
-        
+        self.chain_left_arm.setjoints(q)
+        self.Q.setSome(self.jointnames('left_arm'), q)
+        self.Qdot.setSome(self.jointnames('left_arm'), qdot)
 
         # Compute the resulting task error (to be used next cycle).
         err  = np.vstack((ep(pd, self.chain_left_arm.ptip()), eR(Rd, self.chain_left_arm.Rtip())))
@@ -211,16 +189,6 @@ class Trajectory():
 
         qdot_all = self.Qdot.retAll()
 
-        self.Q2 = Q(self.jointnames())
-        self.Qdot2 = Q(self.jointnames())
-        
-        self.Qdot2.setAll(0)
-        self.Q2.setAll(0)
-        self.Q2.setSome(['r_arm_shx', 'l_arm_shx', 'r_arm_shz', 'l_arm_shz', 'rotate_y', 'mov_z'], np.array([0.25, -0.25, np.pi/2, -np.pi/2, 0.95, 0.51]))
-        
-        q_all = self.Q2.retAll()
-        qdot_all = self.Qdot2.retAll()
-        
         return (q_all.flatten().tolist(), qdot_all.flatten().tolist())
 
         

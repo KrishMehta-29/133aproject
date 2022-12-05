@@ -25,6 +25,7 @@ setup(
     entry_points={
         'console_scripts': [
             'pushup = 133aproject.pushup:main',
+            'pushup_full = 133aproject.pushup_full:main',
         ],
     },
 )
