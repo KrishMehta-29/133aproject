@@ -44,12 +44,19 @@ class Q:
     def retAll(self):
         return self.retSome(self.joint_names)
 
+    def __len__(self):
+        return len(self.joint_names)
+
 class Jacobian():
-    def __init__(self, joints, JP, JR) -> None:
-        J = np.vstack(JP, JR)
+    def __init__(self, joints, chain) -> None:
+
+        Jv = chain.Jv()
+        Jw = chain.Jw()
+        J = np.vstack((Jv, Jw))
+        print("Jacobian Shape", J.shape, "Length", len(joints))
         self.Jacobian = J
         self.joints = joints
-        self.columns = dict([(joint, J[i, :]) for (i, joint) in enumerate(self.joints)])
+        self.columns = dict([(joint, J[:, i]) for (i, joint) in enumerate(self.joints)])
 
     def merge(Js, joints):
         columns = len(joints)
@@ -101,7 +108,7 @@ class Trajectory():
         self.chain_world_pelvis.setjoints(self.Q.retSome(self.jointnames('world_pelvis')))
 
         # Also zero the task error.
-        self.err = np.zeros((6, 1))
+        self.err = np.zeros((24, 1))
 
         # Pick the convergence bandwidth.
         self.lam = 30
@@ -144,24 +151,44 @@ class Trajectory():
         # Use the path variables to compute the position trajectory.
         pd = np.array([-0.3*s    , 0.5, 0.75-0.6*s**2  ]).reshape((3,1))
         vd = np.array([-0.3*sdot , 0.0,     -1.2*s*sdot]).reshape((3,1))
+
+        pd = np.zeros((len(self.Q), 1))
+        vd = np.zeros((len(self.Q), 1))
         
         Rd = Reye()
         wd = np.zeros((3,1))
         
         # Grab the last joint value and task error.
-        q   = self.Q.retSome(self.jointnames('left_arm'))
+        
+        q = self.Q.retAll()
         err = self.err
-
+        
         # Compute the inverse kinematics
-        J    = np.vstack((self.chain_left_arm.Jv(),self.chain_left_arm.Jw()))
-        xdot = np.vstack((vd, wd))
-        qdot = np.linalg.pinv(J) @ (xdot + self.lam * err)
+        J_left_arm = Jacobian(self.jointnames('left_arm'), self.chain_left_arm)
+        J_right_arm = Jacobian(self.jointnames('right_arm'), self.chain_right_arm)
+        J_left_leg = Jacobian(self.jointnames('left_leg'), self.chain_left_leg)
+        J_right_leg = Jacobian(self.jointnames('right_leg'), self.chain_left_leg)
+        JMerged = Jacobian.merge([J_left_arm, J_right_arm, J_left_leg, J_right_leg], self.jointnames())
+
+        print(f"JMerged Shape: {JMerged.shape}")
+
+        # TODO
+        xdot = np.zeros((24, 1))
+        print(f"xdot {xdot.shape}, error {err.shape}" )
+
+        qdot = np.linalg.pinv(JMerged) @ (xdot + self.lam * err)
 
         # Integrate the joint position and update the kin chain data.
         q = q + dt * qdot
-        self.chain_left_arm.setjoints(q)
-        self.Q.setSome(self.jointnames('left_arm'), q)
-        self.Qdot.setSome(self.jointnames('left_arm'), qdot)
+        
+        self.Q.setAll(q)
+        self.Qdot.setAll(qdot)
+
+        self.chain_left_arm.setjoints(self.Q.retSome(self.jointnames('left_arm')))
+        self.chain_right_arm.setjoints(self.Q.retSome(self.jointnames('right_arm')))
+        self.chain_left_leg.setjoints(self.Q.retSome(self.jointnames('left_leg')))
+        self.chain_right_leg.setjoints(self.Q.retSome(self.jointnames('right_leg')))
+        
 
         # Compute the resulting task error (to be used next cycle).
         err  = np.vstack((ep(pd, self.chain_left_arm.ptip()), eR(Rd, self.chain_left_arm.Rtip())))
@@ -173,9 +200,18 @@ class Trajectory():
         # return (q.flatten().tolist(), qdot.flatten().tolist())       
         # test code
         q_all = self.Q.retAll()
-        print(q_all)
         qdot_all = self.Qdot.retAll()
-        print(qdot_all)
+
+        self.Q2 = Q(self.jointnames())
+        self.Qdot2 = Q(self.jointnames())
+        
+        self.Qdot2.setAll(0)
+        self.Q2.setAll(0)
+        self.Q2.setSome(['r_arm_shx', 'l_arm_shx', 'r_arm_shz', 'l_arm_shz', 'rotate_y', 'mov_z'], np.array([0.25, -0.25, np.pi/2, -np.pi/2, 0.95, 0.51]))
+        
+        q_all = self.Q2.retAll()
+        qdot_all = self.Qdot2.retAll()
+        
         return (q_all.flatten().tolist(), qdot_all.flatten().tolist())
 
         
