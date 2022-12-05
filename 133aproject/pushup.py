@@ -173,9 +173,9 @@ class Trajectory():
         # return (q.flatten().tolist(), qdot.flatten().tolist())       
         # test code
         q_all = self.Q.retAll()
-        print(q_all)
+
         qdot_all = self.Qdot.retAll()
-        print(qdot_all)
+
         return (q_all.flatten().tolist(), qdot_all.flatten().tolist())
 
         
