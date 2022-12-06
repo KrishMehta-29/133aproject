@@ -211,7 +211,14 @@ class Trajectory():
 
         # Integrate the joint position and update the kin chain data.
         q = q + dt * qdot
-        
+        sq = np.copy(q)
+        print("here")
+        qsec = Q(self.jointnames())
+        qsec.setSome(self.jointnames(), q)
+        qsec.setSome(['l_leg_aky', 'r_leg_aky', 'back_bky'], [0, 0, 0])
+        print(f"QSEC: {qsec}")
+        sdot = (np.identity(len(q)) - JInv @ JMerged) @ (0.5*(qsec.retAll() - q))
+        q += sdot
         self.Q.setSome(self.jointnames(), q)
         self.Qdot.setAll(qdot)
 
@@ -240,6 +247,17 @@ class Trajectory():
         # test code
         q_all = self.Q.retAll()
         qdot_all = self.Qdot.retAll()
+        
+        self.Q2 = Q(self.jointnames())
+        self.Qdot2 = Q(self.jointnames())
+        
+        self.Qdot2.setAll(0.0)
+        self.Q2.setAll(0.0)
+        self.Q2.setSome(['r_arm_shx', 'l_arm_shx', 'r_arm_shz', 'l_arm_shz', 'rotate_y', 'mov_z'], np.array([0.25, -0.25, np.pi/2, -np.pi/2, 0.95, 0.51]))
+        
+        # q_all = self.Q2.retAll()
+        # qdot_all = self.Qdot2.retAll()
+        print(self.Q.retSome(['l_leg_aky', 'r_leg_aky', 'back_bky']))
 
         return (q_all.flatten().tolist(), qdot_all.flatten().tolist())
 
