@@ -116,10 +116,10 @@ class Trajectory():
         self.chain_world_pelvis.setjoints(self.Q.retSome(self.jointnames('world_pelvis')))
 
         # Also zero the task error.
-        self.err = np.zeros((24, 1))
+        self.err = np.zeros((30, 1))
 
         # Pick the convergence bandwidth.
-        self.lam = 30
+        self.lam = 0
         self.X = X()
 
 
@@ -170,29 +170,23 @@ class Trajectory():
         
         return np.array([[r00, r01, r02], [r10, r11, r12], [r20, r21, r22]])
     
-    def left_arm_pos(self, t):
-        s    =               0.5 * np.cos(np.pi/2.5 * t)
-        orient = self.quat_to_angle([-0.399, 0.399, -0.583, 0.583])
-        return (np.array([0.704, 0.266, 0.0047 * s]).reshape((-1,1)), orient)
+    def pelvis_pos(self, t):
+        s = 0.5 * np.cos(np.pi/2.5 * t)
+        orient = R_from_quat(np.array([0, 0.457, 0, 0.8892]))
+        return (np.array([0, 0, 0.51 * s]).reshape((-1,1)), orient)
     
-    def left_arm_vel(self, t):
+    def pelvis_vel(self, t):
         sdot = - 0.5 * np.pi/2.5 * np.sin(np.pi/2.5 * t)
         return (np.array([0, 0, sdot]).reshape((-1,1)), np.array([0, 0, 0]).reshape((-1,1)))
     	
 
     # Evaluate at the given time.  This was last called (dt) ago.
     def evaluate(self, t, dt):
-        leftArmPos = self.left_arm_pos(t)
-        rightArmPos = (np.array([0.704, -0.226, 0.00474]).reshape((-1, 1)), R_from_quat(np.array([-0.0399, 0.399, 0.583, 0.583])))
+        leftArmPos = (np.array([0.704, 0.226, 0.00474]).reshape((-1, 1)), R_from_quat(np.array([-0.0399, 0.399, -0.583, 0.583])))
+        rightArmPos = (np.array([0.704, -0.226, 0.00474]).reshape((-1, 1)), R_from_quat(np.array([0.0399, 0.399, 0.583, 0.583])))
         leftLegPos = (np.array([0.704, 0.225, 0.0047]).reshape((-1, 1)), R_from_quat(np.array([0, 0.4573, 0, 0.8892])))
         rightLegPos = (np.array([0.704, -0.226, 0.0047]).reshape((-1, 1)), R_from_quat(np.array([0.0399, 0.399, 0.583, 0.583])))
-
-        # Use the path variables to compute the position trajectory.
-        pd = np.ones((len(self.Q), 1))
-        vd = np.ones((len(self.Q), 1))
-        
-        Rd = Reye()
-        wd = np.zeros((3,1))
+        pelvisPos = self.pelvis_pos(t)
         
         # Grab the last joint value and task error.
         
@@ -205,14 +199,13 @@ class Trajectory():
         J_right_arm = Jacobian(self.jointnames('right_arm'), self.chain_right_arm)
         J_left_leg = Jacobian(self.jointnames('left_leg'), self.chain_left_leg)
         J_right_leg = Jacobian(self.jointnames('right_leg'), self.chain_left_leg)
-        JMerged = Jacobian.merge([J_left_arm, J_right_arm, J_left_leg, J_right_leg], self.jointnames())
-
+        J_pelvis = Jacobian(self.jointnames('world_pelvis'), self.chain_world_pelvis)
+        JMerged = Jacobian.merge([J_left_arm, J_right_arm, J_left_leg, J_right_leg, J_pelvis], self.jointnames())
 
         # TODO
-        xdot = np.zeros((24, 1))
-        xdot[0:3, :] = self.left_arm_vel(t)[0]
+        xdot = np.zeros((30, 1))
+        xdot[24:27, :] = self.pelvis_vel(t)[0]
         
-
         JInv = JMerged.T @ np.linalg.inv(JMerged @ JMerged.T)
         qdot = JInv @ (xdot + self.lam * err)
 
@@ -226,29 +219,28 @@ class Trajectory():
         self.chain_right_arm.setjoints(self.Q.retSome(self.jointnames('right_arm')))
         self.chain_left_leg.setjoints(self.Q.retSome(self.jointnames('left_leg')))
         self.chain_right_leg.setjoints(self.Q.retSome(self.jointnames('right_leg')))
+        self.chain_world_pelvis.setjoints(self.Q.retSome(self.jointnames('world_pelvis')))
         
-
         # Compute the resulting task error (to be used next cycle).
 
-        chains = [self.chain_left_arm, self.chain_right_arm, self.chain_left_leg, self.chain_right_leg]
+        chains = [self.chain_left_arm, self.chain_right_arm, self.chain_left_leg, self.chain_right_leg, self.chain_world_pelvis]
         tipPositions = [(c.ptip(), c.Rtip()) for c in chains]
 
-        err = self.X.calculateError(tipPositions, [leftArmPos, rightArmPos, leftLegPos, rightLegPos])
+        err = self.X.calculateError(tipPositions, [leftArmPos, rightArmPos, leftLegPos, rightLegPos, pelvisPos])
         # err = np.zeros((24, 1))
 
 
         # Save the joint value and task error for the next cycle.
         self.err = err
 
+        
+
         # Return the position and velocity as python lists.
         # return (q.flatten().tolist(), qdot.flatten().tolist())       
         # test code
         q_all = self.Q.retAll()
-
         qdot_all = self.Qdot.retAll()
 
-        print(self.Q.retSome(["mov_x", "mov_y", "mov_z"]))
-        
         return (q_all.flatten().tolist(), qdot_all.flatten().tolist())
 
         
