@@ -48,6 +48,9 @@ class Q:
 
     def __len__(self):
         return len(self.joint_names)
+        
+    def __str__(self):
+        return str(self.joint_values)
 
 class Jacobian():
     def __init__(self, joints, chain) -> None:
@@ -215,8 +218,7 @@ class Trajectory():
         qsec.setSome(self.jointnames(), q)
         # l_leg_akyr_leg_aky
         qsec.setSome(['back_bky', 'back_bkx'], [0, 0])
-        print(f"QSEC: {qsec}")
-        sdot = (np.identity(len(q)) - JInv @ JMerged) @ (0.9*(qsec.retAll() - q))
+        sdot = (np.identity(len(q)) - JInv @ JMerged) @ (0.05*(qsec.retAll() - q))
         qdot += sdot
         q = q + dt * qdot
         self.Q.setSome(self.jointnames(), q)
@@ -255,7 +257,7 @@ class Trajectory():
         
         #q_all = self.Q2.retAll()
         #qdot_all = self.Qdot2.retAll()
-        print(self.Q.retSome(['l_leg_aky', 'r_leg_aky', 'back_bky']))
+        print(self.Q)
 
         return (q_all.flatten().tolist(), qdot_all.flatten().tolist())
 
