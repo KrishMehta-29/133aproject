@@ -78,7 +78,7 @@ class Jacobian():
 class X():
     def calculateError(self, currentValues, desiredValues):
         # desiredValues = [(chain1p, chain1r), (chain2p, chain2r), ...]
-        errors = [(ep(tipP, desP), eR(tipR, desR)) for ((tipP, tipR), (desP, desR)) in zip(currentValues, desiredValues)]
+        errors = [(ep(desP, tipP), eR(desR, tipR)) for ((tipP, tipR), (desP, desR)) in zip(currentValues, desiredValues)]
         flatErrors = [item for sublist in errors for item in sublist]
         return np.vstack(tuple(flatErrors))
 
@@ -97,7 +97,6 @@ class Trajectory():
         self.chain_left_leg = KinematicChain(node, 'world', 'l_foot', self.jointnames('left_leg'))
         self.chain_right_leg = KinematicChain(node, 'world', 'r_foot', self.jointnames('right_leg'))
         
-
         # Initialize the current joint position and chain data.
         # TODO Initialize all the chains 
 
@@ -119,7 +118,7 @@ class Trajectory():
         self.err = np.zeros((30, 1))
 
         # Pick the convergence bandwidth.
-        self.lam = 0
+        self.lam = 30
         self.X = X()
 
 
@@ -182,10 +181,10 @@ class Trajectory():
 
     # Evaluate at the given time.  This was last called (dt) ago.
     def evaluate(self, t, dt):
+        leftLegPos = (np.array([-0.704, 0.115, 0.0085]).reshape((-1, 1)), R_from_quat(np.array([0, 0.4573, 0, 0.583])))
         leftArmPos = (np.array([0.704, 0.226, 0.00474]).reshape((-1, 1)), R_from_quat(np.array([-0.0399, 0.399, -0.583, 0.583])))
-        rightArmPos = (np.array([0.704, -0.226, 0.00474]).reshape((-1, 1)), R_from_quat(np.array([0.0399, 0.399, 0.583, 0.583])))
-        leftLegPos = (np.array([0.704, 0.225, 0.0047]).reshape((-1, 1)), R_from_quat(np.array([0, 0.4573, 0, 0.8892])))
-        rightLegPos = (np.array([0.704, -0.226, 0.0047]).reshape((-1, 1)), R_from_quat(np.array([0.0399, 0.399, 0.583, 0.583])))
+        rightLegPos = (np.array([-0.704, -0.115, 0.0085]).reshape((-1, 1)), R_from_quat(np.array([0, 0.4573, 0, 0.8892])))
+        rightArmPos = (np.array([0.704, -0.226, 0.0047]).reshape((-1, 1)), R_from_quat(np.array([0.0399, 0.399, 0.583, 0.583])))
         pelvisPos = self.pelvis_pos(t)
         
         # Grab the last joint value and task error.
@@ -236,11 +235,10 @@ class Trajectory():
         err = self.X.calculateError(tipPositions, [leftArmPos, rightArmPos, leftLegPos, rightLegPos, pelvisPos])
         # err = np.zeros((24, 1))
 
+        print(err)
 
         # Save the joint value and task error for the next cycle.
         self.err = err
-
-        
 
         # Return the position and velocity as python lists.
         # return (q.flatten().tolist(), qdot.flatten().tolist())       
