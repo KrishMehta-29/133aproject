@@ -173,21 +173,21 @@ class Trajectory():
         return np.array([[r00, r01, r02], [r10, r11, r12], [r20, r21, r22]])
     
     def pelvis_pos(self, t):
-        s = 0.5 * np.cos(np.pi/2.5 * t)
-        orient = R_from_quat(np.array([0, 0.457, 0, 0.8892]))
-        return (np.array([0, 0, 0.51 * s]).reshape((-1,1)), orient)
+        s = 0.1 * np.cos(np.pi * t)
+        orient = R_from_quat(np.array([0.889, 0, 0.4573, 0]))
+        return (np.array([0, 0, 0.51 + s]).reshape((-1,1)), orient)
     
     def pelvis_vel(self, t):
-        sdot = - 0.5 * np.pi/2.5 * np.sin(np.pi/2.5 * t)
+        sdot = - 0.1 * np.pi * np.sin(np.pi * t)
         return (np.array([0, 0, sdot]).reshape((-1,1)), np.array([0, 0, 0]).reshape((-1,1)))
     	
 
     # Evaluate at the given time.  This was last called (dt) ago.
     def evaluate(self, t, dt):
-        leftLegPos = (np.array([-0.704, 0.115, 0.0085]).reshape((-1, 1)), R_from_quat(np.array([0, 0.4573, 0, 0.8892])))
-        leftArmPos = (np.array([0.704, 0.226, 0.00474]).reshape((-1, 1)), R_from_quat(np.array([-0.0399, 0.399, -0.583, 0.583])))
-        rightLegPos = (np.array([-0.704, -0.115, 0.0085]).reshape((-1, 1)), R_from_quat(np.array([0, 0.4573, 0, 0.8892])))
-        rightArmPos = (np.array([0.704, -0.226, 0.0047]).reshape((-1, 1)), R_from_quat(np.array([0.0399, 0.399, 0.583, 0.583])))
+        leftLegPos = (np.array([-0.704, 0.115, 0.0085]).reshape((-1, 1)), R_from_quat(np.array([0.8892, 0, 0.4573, 0])))
+        leftArmPos = (np.array([0.704, 0.226, 0.00474]).reshape((-1, 1)), R_from_quat(np.array([0.583, -0.0399, 0.399, -0.583])))
+        rightLegPos = (np.array([-0.704, -0.115, 0.0085]).reshape((-1, 1)), R_from_quat(np.array([0.8892, 0, 0.4573, 0])))
+        rightArmPos = (np.array([0.704, -0.226, 0.0047]).reshape((-1, 1)), R_from_quat(np.array([0.583, 0.0399, 0.0399, 0.583])))
         pelvisPos = self.pelvis_pos(t)
         
         # Grab the last joint value and task error.
@@ -200,7 +200,7 @@ class Trajectory():
         J_left_arm = Jacobian(self.jointnames('left_arm'), self.chain_left_arm)
         J_right_arm = Jacobian(self.jointnames('right_arm'), self.chain_right_arm)
         J_left_leg = Jacobian(self.jointnames('left_leg'), self.chain_left_leg)
-        J_right_leg = Jacobian(self.jointnames('right_leg'), self.chain_left_leg)
+        J_right_leg = Jacobian(self.jointnames('right_leg'), self.chain_right_leg)
         J_pelvis = Jacobian(self.jointnames('world_pelvis'), self.chain_world_pelvis)
         JMerged = Jacobian.merge([J_left_arm, J_right_arm, J_left_leg, J_right_leg, J_pelvis], self.jointnames())
 
@@ -212,14 +212,14 @@ class Trajectory():
         qdot = JInv @ (xdot + self.lam * err)
 
         # Integrate the joint position and update the kin chain data.
-        
-        sq = np.copy(q)
+        # sq = np.copy(q)
         qsec = Q(self.jointnames())
         qsec.setSome(self.jointnames(), q)
-        # l_leg_akyr_leg_aky
-        qsec.setSome(['back_bky', 'back_bkx'], [0, 0])
-        sdot = (np.identity(len(q)) - JInv @ JMerged) @ (0.05*(qsec.retAll() - q))
+        qsec.setSome(['l_leg_kny', 'r_leg_kny'], [0.45, 0.45])
+        
+        sdot = (np.identity(len(q)) - JInv @ JMerged) @ (0.05 * (qsec.retAll() - q))
         qdot += sdot
+
         q = q + dt * qdot
         self.Q.setSome(self.jointnames(), q)
         self.Qdot.setAll(qdot)
@@ -254,7 +254,7 @@ class Trajectory():
         self.Qdot2.setAll(0.0)
         self.Q2.setAll(0.0)
         self.Q2.setSome(['r_arm_shx', 'l_arm_shx', 'r_arm_shz', 'l_arm_shz', 'rotate_y', 'mov_z'], np.array([0.25, -0.25, np.pi/2, -np.pi/2, 0.95, 0.51]))
-        
+    
         #q_all = self.Q2.retAll()
         #qdot_all = self.Qdot2.retAll()
         print(self.Q)
