@@ -74,6 +74,22 @@ class Jacobian():
             rowInput += size
                 
         return mergedJ
+
+
+class X():
+    def __init__(self, chains) -> None:
+        # Chains should just be a dictionary of chains
+        self.chains = chains
+
+    def calculateError(self, desiredValues):
+        # desiredValues = [(chain1p, chain1r), (chain2p, chain2r), ...]
+        
+        tipPoses = [(self.chains[i].ptip(), self.chains[i].rtip()) for (i, (desP, desR)) in enumerate(desiredValues)]
+        errors = [(ep(tipP, desP), eR(tipR, desR)) for ((tipP, tipR), (desP, desR)) in zip(tipPoses, desiredValues)]
+        
+        flatErrors = [item for sublist in errors for item in sublist]
+        return np.vstack(tuple(flatErrors))
+
 #
 #   Trajectory Class
 #
