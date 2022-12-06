@@ -54,7 +54,6 @@ class Jacobian():
         Jv = chain.Jv()
         Jw = chain.Jw()
         J = np.vstack((Jv, Jw))
-        print("Jacobian Shape", J.shape, "Length", len(joints))
         self.Jacobian = J
         self.joints = joints
         self.columns = dict([(joint, J[:, i]) for (i, joint) in enumerate(self.joints)])
@@ -77,16 +76,9 @@ class Jacobian():
 
 
 class X():
-    def __init__(self, chains) -> None:
-        # Chains should just be a dictionary of chains
-        self.chains = chains
-
-    def calculateError(self, desiredValues):
+    def calculateError(self, currentValues, desiredValues):
         # desiredValues = [(chain1p, chain1r), (chain2p, chain2r), ...]
-        
-        tipPoses = [(self.chains[i].ptip(), self.chains[i].rtip()) for (i, (desP, desR)) in enumerate(desiredValues)]
-        errors = [(ep(tipP, desP), eR(tipR, desR)) for ((tipP, tipR), (desP, desR)) in zip(tipPoses, desiredValues)]
-        
+        errors = [(ep(tipP, desP), eR(tipR, desR)) for ((tipP, tipR), (desP, desR)) in zip(currentValues, desiredValues)]
         flatErrors = [item for sublist in errors for item in sublist]
         return np.vstack(tuple(flatErrors))
 
@@ -128,7 +120,7 @@ class Trajectory():
 
         # Pick the convergence bandwidth.
         self.lam = 30
-        self.x_des = np.array([])
+        self.X = X()
 
 
     # Declare the joint names.
@@ -178,25 +170,24 @@ class Trajectory():
         
         return np.array([[r00, r01, r02], [r10, r11, r12], [r20, r21, r22]])
     
-    def get_joint_pos_left_foot(self, t):
-        pos = np.zeros((len(joints), 1))
-        s    =               np.cos(np.pi/2.5 * t)
-        
-        orient = self.quat_to_angle([0, 0.4573, 0, 0.8892])
-        return (np.array([0.7046*s, 0.225, 0.0047]).respahe((-1,1)), orient)
+    def left_arm_pos(self, t):
+        s    =               0.5 * np.cos(np.pi/2.5 * t)
+        orient = self.quat_to_angle([-0.399, 0.399, -0.583, 0.583])
+        return (np.array([0.704, 0.266, 0.0047 * s]).reshape((-1,1)), orient)
     
-    def get_join_vel_left_foot(self, t):
-        sdot = - np.pi/2.5 * np.sin(np.pi/2.5 * t-3)
-        return (np.array([sdot, 0, 0]).reshape((-1,1)), np.array([0, 0, 0]).reshape((-1,1)))
+    def left_arm_vel(self, t):
+        sdot = - 0.5 * np.pi/2.5 * np.sin(np.pi/2.5 * t)
+        return (np.array([0, 0, sdot]).reshape((-1,1)), np.array([0, 0, 0]).reshape((-1,1)))
     	
 
     # Evaluate at the given time.  This was last called (dt) ago.
     def evaluate(self, t, dt):
-    
+        leftArmPos = self.left_arm_pos(t)
+        rightArmPos = (np.array([0.704, -0.226, 0.00474]).reshape((-1, 1)), R_from_quat(np.array([-0.0399, 0.399, 0.583, 0.583])))
+        leftLegPos = (np.array([0.704, 0.225, 0.0047]).reshape((-1, 1)), R_from_quat(np.array([0, 0.4573, 0, 0.8892])))
+        rightLegPos = (np.array([0.704, -0.226, 0.0047]).reshape((-1, 1)), R_from_quat(np.array([0.0399, 0.399, 0.583, 0.583])))
+
         # Use the path variables to compute the position trajectory.
-        pd = np.array([-0.3*s    , 0.5, 0.75-0.6*s**2  ]).reshape((3,1))
-        vd = np.array([-0.3*sdot , 0.0,     -1.2*s*sdot]).reshape((3,1))
-        print(len(self.Q))
         pd = np.ones((len(self.Q), 1))
         vd = np.ones((len(self.Q), 1))
         
@@ -216,24 +207,20 @@ class Trajectory():
         J_right_leg = Jacobian(self.jointnames('right_leg'), self.chain_left_leg)
         JMerged = Jacobian.merge([J_left_arm, J_right_arm, J_left_leg, J_right_leg], self.jointnames())
 
-        print(f"JMerged Shape: {JMerged.shape}")
 
         # TODO
         xdot = np.zeros((24, 1))
-        print(f"xdot {xdot.shape}, error {err.shape}" )
+        xdot[0:3, :] = self.left_arm_vel(t)[0]
+        
 
-        qdot = np.linalg.pinv(JMerged) @ (xdot + self.lam * err)
+        JInv = JMerged.T @ np.linalg.inv(JMerged @ JMerged.T)
+        qdot = JInv @ (xdot + self.lam * err)
 
         # Integrate the joint position and update the kin chain data.
         q = q + dt * qdot
         
-        print(q.shape)
-        print(len(self.Q))
-
         self.Q.setSome(self.jointnames(), q)
         self.Qdot.setAll(qdot)
-
-        print(self.Q.retSome(self.jointnames('left_arm')).shape)
 
         self.chain_left_arm.setjoints(self.Q.retSome(self.jointnames('left_arm')))
         self.chain_right_arm.setjoints(self.Q.retSome(self.jointnames('right_arm')))
@@ -242,7 +229,13 @@ class Trajectory():
         
 
         # Compute the resulting task error (to be used next cycle).
-        err  = np.zeros((24, 1))# np.vstack((ep(pd, self.chain_left_arm.ptip()), eR(Rd, self.chain_left_arm.Rtip())))
+
+        chains = [self.chain_left_arm, self.chain_right_arm, self.chain_left_leg, self.chain_right_leg]
+        tipPositions = [(c.ptip(), c.Rtip()) for c in chains]
+
+        err = self.X.calculateError(tipPositions, [leftArmPos, rightArmPos, leftLegPos, rightLegPos])
+        # err = np.zeros((24, 1))
+
 
         # Save the joint value and task error for the next cycle.
         self.err = err
@@ -254,15 +247,7 @@ class Trajectory():
 
         qdot_all = self.Qdot.retAll()
 
-        self.Q2 = Q(self.jointnames())
-        self.Qdot2 = Q(self.jointnames())
-        
-        self.Qdot2.setAll(0.0)
-        self.Q2.setAll(0.0)
-        self.Q2.setSome(['r_arm_shx', 'l_arm_shx', 'r_arm_shz', 'l_arm_shz', 'rotate_y', 'mov_z'], np.array([0.25, -0.25, np.pi/2, -np.pi/2, 0.95, 0.51]))
-        
-        q_all = self.Q.retAll()
-        qdot_all = self.Qdot.retAll()
+        print(self.Q.retSome(["mov_x", "mov_y", "mov_z"]))
         
         return (q_all.flatten().tolist(), qdot_all.flatten().tolist())
 
