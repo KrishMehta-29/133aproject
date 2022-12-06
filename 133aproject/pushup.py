@@ -51,7 +51,6 @@ class Q:
 
 class Jacobian():
     def __init__(self, joints, chain) -> None:
-
         Jv = chain.Jv()
         Jw = chain.Jw()
         J = np.vstack((Jv, Jw))
@@ -75,7 +74,6 @@ class Jacobian():
             rowInput += size
                 
         return mergedJ
-
 #
 #   Trajectory Class
 #
@@ -114,6 +112,7 @@ class Trajectory():
 
         # Pick the convergence bandwidth.
         self.lam = 30
+        self.x_des = np.array([])
 
 
     # Declare the joint names.
@@ -142,20 +141,48 @@ class Trajectory():
             return joints['world_pelvis']
              
         return joints['world_pelvis'] + joints[which_chain]
+        
+    def quat_to_angle(self, quat):
+        q0 = quat[0]
+        q1 = quat[1]
+        q2 = quat[2]
+        q3 = quat[3]
+        
+        r00 = 2 * (q0 ** 2 + q1**2) - 1
+        r01 = 2*(q1*q2 - q0*q3)
+        r02 = 2*(q1*q3 + q0*q2)
+        
+        r10 = 2*(q1*q2 + q0*q3)
+        r11 = 2*(q0**2 + q2**2) - 1
+        r12 = 2*(q2*q3 - q0*q1)
+        
+        r20 = 2*(q1*q3 - q0*q2)
+        r21 = 2*(q2*q3 + q0*q1)
+        r22 = 2*(q0**2 + q3**3) - 1
+        
+        return np.array([[r00, r01, r02], [r10, r11, r12], [r20, r21, r22]])
+    
+    def get_joint_pos_left_foot(self, t):
+        pos = np.zeros((len(joints), 1))
+        s    =               np.cos(np.pi/2.5 * t)
+        
+        orient = self.quat_to_angle([0, 0.4573, 0, 0.8892])
+        return (np.array([0.7046*s, 0.225, 0.0047]).respahe((-1,1)), orient)
+    
+    def get_join_vel_left_foot(self, t):
+        sdot = - np.pi/2.5 * np.sin(np.pi/2.5 * t-3)
+        return (np.array([sdot, 0, 0]).reshape((-1,1)), np.array([0, 0, 0]).reshape((-1,1)))
+    	
 
     # Evaluate at the given time.  This was last called (dt) ago.
     def evaluate(self, t, dt):
     
-        # Cyclic (sinusoidal) movements, after the first 3s.
-        s    =               np.cos(np.pi/2.5 * (t-3))
-        sdot = - np.pi/2.5 * np.sin(np.pi/2.5 * (t-3))
-
         # Use the path variables to compute the position trajectory.
         pd = np.array([-0.3*s    , 0.5, 0.75-0.6*s**2  ]).reshape((3,1))
         vd = np.array([-0.3*sdot , 0.0,     -1.2*s*sdot]).reshape((3,1))
-
-        pd = np.zeros((len(self.Q), 1))
-        vd = np.zeros((len(self.Q), 1))
+        print(len(self.Q))
+        pd = np.ones((len(self.Q), 1))
+        vd = np.ones((len(self.Q), 1))
         
         Rd = Reye()
         wd = np.zeros((3,1))
@@ -199,7 +226,7 @@ class Trajectory():
         
 
         # Compute the resulting task error (to be used next cycle).
-        err  = np.vstack((ep(pd, self.chain_left_arm.ptip()), eR(Rd, self.chain_left_arm.Rtip())))
+        err  = np.zeros((24, 1))# np.vstack((ep(pd, self.chain_left_arm.ptip()), eR(Rd, self.chain_left_arm.Rtip())))
 
         # Save the joint value and task error for the next cycle.
         self.err = err
@@ -214,12 +241,12 @@ class Trajectory():
         self.Q2 = Q(self.jointnames())
         self.Qdot2 = Q(self.jointnames())
         
-        self.Qdot2.setAll(0)
-        self.Q2.setAll(0)
+        self.Qdot2.setAll(0.0)
+        self.Q2.setAll(0.0)
         self.Q2.setSome(['r_arm_shx', 'l_arm_shx', 'r_arm_shz', 'l_arm_shz', 'rotate_y', 'mov_z'], np.array([0.25, -0.25, np.pi/2, -np.pi/2, 0.95, 0.51]))
         
-        q_all = self.Q2.retAll()
-        qdot_all = self.Qdot2.retAll()
+        q_all = self.Q.retAll()
+        qdot_all = self.Qdot.retAll()
         
         return (q_all.flatten().tolist(), qdot_all.flatten().tolist())
 
