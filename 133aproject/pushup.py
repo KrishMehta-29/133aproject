@@ -181,7 +181,7 @@ class Trajectory():
 
     # Evaluate at the given time.  This was last called (dt) ago.
     def evaluate(self, t, dt):
-        leftLegPos = (np.array([-0.704, 0.115, 0.0085]).reshape((-1, 1)), R_from_quat(np.array([0, 0.4573, 0, 0.583])))
+        leftLegPos = (np.array([-0.704, 0.115, 0.0085]).reshape((-1, 1)), R_from_quat(np.array([0, 0.4573, 0, 0.8892])))
         leftArmPos = (np.array([0.704, 0.226, 0.00474]).reshape((-1, 1)), R_from_quat(np.array([-0.0399, 0.399, -0.583, 0.583])))
         rightLegPos = (np.array([-0.704, -0.115, 0.0085]).reshape((-1, 1)), R_from_quat(np.array([0, 0.4573, 0, 0.8892])))
         rightArmPos = (np.array([0.704, -0.226, 0.0047]).reshape((-1, 1)), R_from_quat(np.array([0.0399, 0.399, 0.583, 0.583])))
@@ -209,15 +209,16 @@ class Trajectory():
         qdot = JInv @ (xdot + self.lam * err)
 
         # Integrate the joint position and update the kin chain data.
-        q = q + dt * qdot
+        
         sq = np.copy(q)
-        print("here")
         qsec = Q(self.jointnames())
         qsec.setSome(self.jointnames(), q)
-        qsec.setSome(['l_leg_aky', 'r_leg_aky', 'back_bky'], [0, 0, 0])
+        # l_leg_akyr_leg_aky
+        qsec.setSome(['back_bky', 'back_bkx'], [0, 0])
         print(f"QSEC: {qsec}")
-        sdot = (np.identity(len(q)) - JInv @ JMerged) @ (0.5*(qsec.retAll() - q))
-        q += sdot
+        sdot = (np.identity(len(q)) - JInv @ JMerged) @ (0.9*(qsec.retAll() - q))
+        qdot += sdot
+        q = q + dt * qdot
         self.Q.setSome(self.jointnames(), q)
         self.Qdot.setAll(qdot)
 
@@ -235,7 +236,6 @@ class Trajectory():
         err = self.X.calculateError(tipPositions, [leftArmPos, rightArmPos, leftLegPos, rightLegPos, pelvisPos])
         # err = np.zeros((24, 1))
 
-        print(err)
 
         # Save the joint value and task error for the next cycle.
         self.err = err
@@ -253,8 +253,8 @@ class Trajectory():
         self.Q2.setAll(0.0)
         self.Q2.setSome(['r_arm_shx', 'l_arm_shx', 'r_arm_shz', 'l_arm_shz', 'rotate_y', 'mov_z'], np.array([0.25, -0.25, np.pi/2, -np.pi/2, 0.95, 0.51]))
         
-        # q_all = self.Q2.retAll()
-        # qdot_all = self.Qdot2.retAll()
+        #q_all = self.Q2.retAll()
+        #qdot_all = self.Qdot2.retAll()
         print(self.Q.retSome(['l_leg_aky', 'r_leg_aky', 'back_bky']))
 
         return (q_all.flatten().tolist(), qdot_all.flatten().tolist())
