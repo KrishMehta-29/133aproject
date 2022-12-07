@@ -117,6 +117,8 @@ class Trajectory():
         
         self.chain_world_pelvis.setjoints(self.Q.retSome(self.jointnames('world_pelvis')))
 
+        self.gamma = 0.05
+
         # Also zero the task error.
         self.err = np.zeros((30, 1))
 
@@ -172,25 +174,26 @@ class Trajectory():
         
         return np.array([[r00, r01, r02], [r10, r11, r12], [r20, r21, r22]])
     
-    def pelvis_pos(self, t):
+    def pelvis_pos(self, t, period):
     	# add explicit length of pushup 
-        s = 0.1 * np.cos((np.pi/20)* t)
+        s = 0.1 * np.cos((np.pi/period)* t)
         orient = R_from_quat(np.array([0.889, 0, 0.4573, 0]))
         return (np.array([0, 0, 0.51 + s]).reshape((-1,1)), orient)
     
-    def pelvis_vel(self, t):
-        sdot = - 0.1 * (np.pi/20) * np.sin((np.pi/20) * t)
+    def pelvis_vel(self, t, period):
+        sdot = - 0.1 * (np.pi/period) * np.sin((np.pi/period) * t)
         return (np.array([0, 0, sdot]).reshape((-1,1)), np.array([0, 0, 0]).reshape((-1,1)))
     	
 
     # Evaluate at the given time.  This was last called (dt) ago.
     def evaluate(self, t, dt):
+        self.period = 5
     
         leftLegPos = (np.array([-0.704, 0.115, 0.0085]).reshape((-1, 1)), R_from_quat(np.array([0.8892, 0, 0.4573, 0])))
         leftArmPos = (np.array([0.704, 0.226, 0.00474]).reshape((-1, 1)), R_from_quat(np.array([0.583, -0.399, 0.399, -0.583])))
         rightLegPos = (np.array([-0.704, -0.115, 0.0085]).reshape((-1, 1)), R_from_quat(np.array([0.8892, 0, 0.4573, 0])))
         rightArmPos = (np.array([0.704, -0.226, 0.0047]).reshape((-1, 1)), R_from_quat(np.array([0.583, 0.399, 0.399, 0.583])))
-        pelvisPos = self.pelvis_pos(t) # changing
+        pelvisPos = self.pelvis_pos(t, self.period) # changing
         
         # Grab the last joint value and task error.
         
@@ -208,9 +211,9 @@ class Trajectory():
 
         # TODO
         xdot = np.zeros((30, 1))
-        xdot[24:27, :] = self.pelvis_vel(t)[0]
+        xdot[24:27, :] = self.pelvis_vel(t, self.period)[0]
         
-        JInv = JMerged.T @ np.linalg.inv(JMerged @ JMerged.T)
+        JInv = JMerged.T @ np.linalg.inv(JMerged @ JMerged.T + self.gamma ** 2 * np.eye(30))
         qdot = JInv @ (xdot + self.lam * err)
 
         # Integrate the joint position and update the kin chain data.
