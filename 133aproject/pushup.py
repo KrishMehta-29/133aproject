@@ -94,6 +94,7 @@ class Trajectory():
         # Set up the kinematic chain object.
         
         self.chain_world_pelvis = KinematicChain(node, 'world', 'pelvis', self.jointnames('world_pelvis'))
+        self.chain_world_chest = KinematicChain(node, 'world', 'chest', self.jointnames('world_chest'))
         
         self.chain_left_arm = KinematicChain(node, 'world', 'l_hand', self.jointnames('left_arm'))
         self.chain_right_arm = KinematicChain(node, 'world', 'r_hand', self.jointnames('right_arm'))
@@ -115,6 +116,7 @@ class Trajectory():
         self.chain_left_leg.setjoints(self.Q.retSome(self.jointnames('left_leg')))
         self.chain_right_leg.setjoints(self.Q.retSome(self.jointnames('right_leg')))
         
+        self.chain_world_chest.setjoints(self.Q.retSome(self.jointnames('world_chest')))
         self.chain_world_pelvis.setjoints(self.Q.retSome(self.jointnames('world_pelvis')))
 
         self.gamma = 0.05
@@ -144,7 +146,8 @@ class Trajectory():
          
          'right_leg':['r_leg_hpz', 'r_leg_hpx', 'r_leg_hpy', 'r_leg_kny', 'r_leg_aky', 'r_leg_akx'], 
          
-         'world_pelvis':['mov_x', 'mov_y', 'mov_z', 'rotate_x', 'rotate_y', 'rotate_z']
+         'world_pelvis':['mov_x', 'mov_y', 'mov_z', 'rotate_x', 'rotate_y', 'rotate_z'],
+         'world_chest':['mov_x', 'mov_y', 'mov_z', 'rotate_x', 'rotate_y', 'rotate_z', 'back_bkz', 'back_bky', 'back_bkx']
          
         }
          
@@ -153,6 +156,8 @@ class Trajectory():
          
         if which_chain == 'world_pelvis':
             return joints['world_pelvis']
+        if which_chain == 'world_chest':
+            return joints['world_chest']
              
         return joints['world_pelvis'] + joints[which_chain]
         
@@ -176,14 +181,16 @@ class Trajectory():
         
         return np.array([[r00, r01, r02], [r10, r11, r12], [r20, r21, r22]])
     
-    def pelvis_pos(self, t, period):
+    def chest_pos(self, t, period):
     	# add explicit length of pushup 
-        s = 0.1 * np.cos((np.pi/period)* t)
+        s = 0.3 * np.cos((np.pi/period)* t)
+        #orient = R_from_quat(np.array([0.889, 0, 0.4573, 0]))
         orient = R_from_quat(np.array([0.889, 0, 0.4573, 0]))
-        return (np.array([0, 0, 0.51 + s]).reshape((-1,1)), orient)
+        #return (np.array([0, 0, 0.51 + s]).reshape((-1,1)), orient)
+        return (np.array([0.62882, 0, 0.975044 - 0.3 + s]).reshape((-1,1)), orient)
     
-    def pelvis_vel(self, t, period):
-        sdot = - 0.1 * (np.pi/period) * np.sin((np.pi/period) * t)
+    def chest_vel(self, t, period):
+        sdot = - 0.3 * (np.pi/period) * np.sin((np.pi/period) * t)
         return (np.array([0, 0, sdot]).reshape((-1,1)), np.array([0, 0, 0]).reshape((-1,1)))
     	
 
@@ -195,7 +202,7 @@ class Trajectory():
         leftArmPos = (np.array([0.704, 0.226, 0.00474]).reshape((-1, 1)), R_from_quat(np.array([0.583, -0.399, 0.399, -0.583])))
         rightLegPos = (np.array([-0.704, -0.115, 0.0085]).reshape((-1, 1)), R_from_quat(np.array([0.8892, 0, 0.4573, 0])))
         rightArmPos = (np.array([0.704, -0.226, 0.0047]).reshape((-1, 1)), R_from_quat(np.array([0.583, 0.399, 0.399, 0.583])))
-        pelvisPos = self.pelvis_pos(t, self.period) # changing
+        chestPos = self.chest_pos(t, self.period) # changing
         
         # Grab the last joint value and task error.
         
@@ -208,12 +215,13 @@ class Trajectory():
         J_right_arm = Jacobian(self.jointnames('right_arm'), self.chain_right_arm)
         J_left_leg = Jacobian(self.jointnames('left_leg'), self.chain_left_leg)
         J_right_leg = Jacobian(self.jointnames('right_leg'), self.chain_right_leg)
-        J_pelvis = Jacobian(self.jointnames('world_pelvis'), self.chain_world_pelvis)
-        JMerged = Jacobian.merge([J_left_arm, J_right_arm, J_left_leg, J_right_leg, J_pelvis], self.jointnames())
+        J_chest = Jacobian(self.jointnames('world_chest'), self.chain_world_chest)
+
+        JMerged = Jacobian.merge([J_left_arm, J_right_arm, J_left_leg, J_right_leg, J_chest], self.jointnames())
 
         # TODO
         xdot = np.zeros((30, 1))
-        xdot[24:27, :] = self.pelvis_vel(t, self.period)[0]
+        xdot[24:27, :] = self.chest_vel(t, self.period)[0]
         
         JInv = JMerged.T @ np.linalg.inv(JMerged @ JMerged.T + self.gamma**2 * np.eye(30))
         qdot = JInv @ (xdot + self.lam * err)
@@ -234,14 +242,15 @@ class Trajectory():
         self.chain_right_arm.setjoints(self.Q.retSome(self.jointnames('right_arm')))
         self.chain_left_leg.setjoints(self.Q.retSome(self.jointnames('left_leg')))
         self.chain_right_leg.setjoints(self.Q.retSome(self.jointnames('right_leg')))
-        self.chain_world_pelvis.setjoints(self.Q.retSome(self.jointnames('world_pelvis')))
+        #self.chain_world_pelvis.setjoints(self.Q.retSome(self.jointnames('world_pelvis')))
+        self.chain_world_chest.setjoints(self.Q.retSome(self.jointnames('world_chest')))
         
         # Compute the resulting task error (to be used next cycle).
 
-        chains = [self.chain_left_arm, self.chain_right_arm, self.chain_left_leg, self.chain_right_leg, self.chain_world_pelvis]
+        chains = [self.chain_left_arm, self.chain_right_arm, self.chain_left_leg, self.chain_right_leg, self.chain_world_chest]
         tipPositions = [(c.ptip(), c.Rtip()) for c in chains]
 
-        err = self.X.calculateError(tipPositions, [leftArmPos, rightArmPos, leftLegPos, rightLegPos, pelvisPos])
+        err = self.X.calculateError(tipPositions, [leftArmPos, rightArmPos, leftLegPos, rightLegPos, chestPos])
         # err = np.zeros((24, 1))
 
 
@@ -264,7 +273,7 @@ class Trajectory():
         #q_all = self.Q_still.retAll()
         #qdot_all = self.Qdot_still.retAll()
         
-        print(self.Q)
+        #print(self.Q)
         
         return (q_all.flatten().tolist(), qdot_all.flatten().tolist())
 
