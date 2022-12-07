@@ -81,13 +81,39 @@ class Jacobian():
                 
         return mergedJ
 
-
 class X():
     def calculateError(self, currentValues, desiredValues):
         # desiredValues = [(chain1p, chain1r), (chain2p, chain2r), ...]
         errors = [(ep(desP, tipP), eR(desR, tipR)) for ((tipP, tipR), (desP, desR)) in zip(currentValues, desiredValues)]
         flatErrors = [item for sublist in errors for item in sublist]
         return np.vstack(tuple(flatErrors))
+
+class SetBounds():
+    def __init__(self, min, max, jointName, exp=4) -> None:
+        self.jointName = jointName
+        self.min = min
+        self.max = max
+        self.exp = exp
+
+    def calcQDot(self, capQ):
+        # Need to pass in Q object 
+        q = capQ.retSome([self.jointName])[0]
+        qDotSec = Q(capQ.joint_names)
+        qDotSec.setAll(0.0)
+        qDotParticular = self.exp * (self.T(q) ** (self.exp - 1)) * self.TPrime(q)
+        qDotSec.setSome([self.jointName], np.array(qDotParticular))
+
+        return qDotSec.retAll()
+
+    def T(self, q):
+        return (q - (self.min + self.max)/2) / ((self.max - self.min) / 2)
+
+    def TPrime(self, q):
+        return (q) / ((self.max - self.min) / 2)
+
+    def Error(self, capQ):
+        q = capQ.retSome([self.jointName])[0]
+        return self.T(q)
 
 #
 #   Trajectory Class
@@ -134,9 +160,8 @@ class Trajectory():
         # Pick the convergence bandwidth.
         self.lam = 30
         self.X = X()
-        
-        self.gamma = 0.05
 
+        self.Bounds = [SetBounds(-2.35, 0, 'r_arm_elx'), SetBounds(0, 2.35, 'l_arm_elx'), SetBounds(0, 3.14, 'r_arm_ely'), SetBounds(0, 3.14, 'l_arm_ely')]
 
     # Declare the joint names.
     def jointnames(self, which_chain='all'):
@@ -198,7 +223,6 @@ class Trajectory():
         sdot = - 0.3 * (np.pi/period) * np.sin((np.pi/period) * t)
         return (np.array([0, 0, sdot]).reshape((-1,1)), np.array([0, 0, 0]).reshape((-1,1)))
     	
-
     # Evaluate at the given time.  This was last called (dt) ago.
     def evaluate(self, t, dt):
         self.period = 2
@@ -224,7 +248,6 @@ class Trajectory():
 
         JMerged = Jacobian.merge([J_left_arm, J_right_arm, J_left_leg, J_right_leg, J_chest], self.jointnames())
 
-        # TODO
         xdot = np.zeros((30, 1))
         xdot[24:27, :] = self.chest_vel(t, self.period)[0]
         
@@ -238,8 +261,17 @@ class Trajectory():
         qsec.setSome(self.jointnames(), q)
         qsec.setSome(['l_leg_kny', 'r_leg_kny'], [0.45, 0.45]) # keep the knees sort of bent
         
-        sdot = (np.identity(len(q)) - JInv @ JMerged) @ (0.05 * (qsec.retAll() - q))
+        # sdot = (np.identity(len(q)) - JInv @ JMerged) @ (0.05 * (qsec.retAll() - q))
         # qdot += sdot
+
+        # Centering the joints (Pushing from limits) TODO FIX 
+
+        # qdotSec = sum([sb.calcQDot(self.Q) for sb in self.Bounds])
+        # sdot = (np.identity(len(q)) - JInv @ JMerged) @ ((0.3 * qdotSec))
+
+        # print(f"Errors {[sb.Error(self.Q) for sb in self.Bounds]}")
+    
+        # qdot = qdot + sdot
 
         q = q + dt * qdot
         self.Q.setSome(self.jointnames(), q)
@@ -269,7 +301,10 @@ class Trajectory():
         # test code
         q_all = self.Q.retAll()
         qdot_all = self.Qdot.retAll()
-        
+
+        wristValues = self.Q.retSome(['l_arm_ely', 'l_arm_elx', 'r_arm_ely', 'r_arm_elx'])
+        print(f"Wrist Values: Left, Right {wristValues}")
+
         self.Q_still = Q(self.jointnames())
         self.Qdot_still = Q(self.jointnames())
         
