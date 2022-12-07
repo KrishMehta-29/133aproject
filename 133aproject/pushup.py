@@ -52,6 +52,10 @@ class Q:
     def __str__(self):
         return str(self.joint_values)
 
+class M(Q):
+    def getMatrix(self, joint_names):
+        return np.diag(np.array([self.joint_values[name] for name in joint_names]))
+
 class Jacobian():
     def __init__(self, joints, chain) -> None:
         Jv = chain.Jv()
@@ -121,6 +125,9 @@ class Trajectory():
 
         self.gamma = 0.05
 
+        self.M = M(self.jointnames())
+        self.M.setAll(1)
+        
         # Also zero the task error.
         self.err = np.zeros((30, 1))
 
@@ -223,7 +230,9 @@ class Trajectory():
         xdot = np.zeros((30, 1))
         xdot[24:27, :] = self.chest_vel(t, self.period)[0]
         
-        JInv = JMerged.T @ np.linalg.inv(JMerged @ JMerged.T + self.gamma**2 * np.eye(30))
+        M = self.M.getMatrix(self.jointnames())
+        MSI = np.linalg.inv(M @ M) # M squared inverse
+        JInv = MSI @ JMerged.T @ np.linalg.inv(JMerged @ MSI @ JMerged.T + self.gamma**2 * np.eye(30))
         qdot = JInv @ (xdot + self.lam * err)
 
         # Integrate the joint position and update the kin chain data.
