@@ -95,8 +95,8 @@ class Trajectory():
         
         self.chain_world_pelvis = KinematicChain(node, 'world', 'pelvis', self.jointnames('world_pelvis'))
         
-        self.chain_left_arm = KinematicChain(node, 'world', 'l_lfarm', self.jointnames('left_arm'))
-        self.chain_right_arm = KinematicChain(node, 'world', 'r_lfarm', self.jointnames('right_arm'))
+        self.chain_left_arm = KinematicChain(node, 'world', 'l_hand', self.jointnames('left_arm'))
+        self.chain_right_arm = KinematicChain(node, 'world', 'r_hand', self.jointnames('right_arm'))
         self.chain_left_leg = KinematicChain(node, 'world', 'l_foot', self.jointnames('left_leg'))
         self.chain_right_leg = KinematicChain(node, 'world', 'r_foot', self.jointnames('right_leg'))
         
@@ -123,6 +123,8 @@ class Trajectory():
         # Pick the convergence bandwidth.
         self.lam = 30
         self.X = X()
+        
+        self.gamma = 0.05
 
 
     # Declare the joint names.
@@ -132,9 +134,9 @@ class Trajectory():
         
         joints = {
         
-        'left_arm':['back_bkz', 'back_bky', 'back_bkx', 'l_arm_shz','l_arm_shx', 'l_arm_ely', 'l_arm_elx', 'l_arm_wry', 'l_arm_wrx'],
+        'left_arm':['back_bkz', 'back_bky', 'back_bkx', 'l_arm_shz','l_arm_shx', 'l_arm_ely', 'l_arm_elx', 'l_arm_wry', 'l_arm_wrx', 'l_arm_wry2'],
         
-         'right_arm': ['back_bkz', 'back_bky', 'back_bkx', 'r_arm_shz','r_arm_shx', 'r_arm_ely', 'r_arm_elx', 'r_arm_wry', 'r_arm_wrx'],
+         'right_arm': ['back_bkz', 'back_bky', 'back_bkx', 'r_arm_shz','r_arm_shx', 'r_arm_ely', 'r_arm_elx', 'r_arm_wry', 'r_arm_wrx', 'r_arm_wry2'],
          
          'left_leg': ['l_leg_hpz', 'l_leg_hpx', 'l_leg_hpy', 'l_leg_kny', 'l_leg_aky', 'l_leg_akx'] , 
          
@@ -210,7 +212,7 @@ class Trajectory():
         xdot = np.zeros((30, 1))
         xdot[24:27, :] = self.pelvis_vel(t)[0]
         
-        JInv = JMerged.T @ np.linalg.inv(JMerged @ JMerged.T)
+        JInv = JMerged.T @ np.linalg.inv(JMerged @ JMerged.T + self.gamma**2 * np.eye(30))
         qdot = JInv @ (xdot + self.lam * err)
 
         # Integrate the joint position and update the kin chain data.
