@@ -191,10 +191,8 @@ class Trajectory():
     def chest_pos(self, t, period):
     	# add explicit length of pushup 
         s = 0.3 * np.cos((np.pi/period)* t)
-        #orient = R_from_quat(np.array([0.889, 0, 0.4573, 0]))
         orient = R_from_quat(np.array([0.889, 0, 0.4573, 0]))
-        #return (np.array([0, 0, 0.51 + s]).reshape((-1,1)), orient)
-        return (np.array([0.62882, 0, 0.975044 - 0.3 + s]).reshape((-1,1)), orient)
+        return (np.array([0.4661, 0, 0.8587 - 0.3 + s]).reshape((-1,1)), orient)
     
     def chest_vel(self, t, period):
         sdot = - 0.3 * (np.pi/period) * np.sin((np.pi/period) * t)
@@ -279,10 +277,8 @@ class Trajectory():
         self.Q_still.setAll(0.0)
         self.Q_still.setSome(['r_arm_shx', 'l_arm_shx', 'r_arm_shz', 'l_arm_shz', 'rotate_y', 'mov_z'], np.array([0.25, -0.25, np.pi/2, -np.pi/2, 0.95, 0.51]))
     
-        #q_all = self.Q_still.retAll()
-        #qdot_all = self.Qdot_still.retAll()
-        
-        #print(self.Q)
+        # q_all = self.Q_still.retAll()
+        # qdot_all = self.Qdot_still.retAll()
         
         return (q_all.flatten().tolist(), qdot_all.flatten().tolist())
 

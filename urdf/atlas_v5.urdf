@@ -818,7 +818,7 @@
   </joint>
   
   <joint name="chest_creator" type="fixed">
-    <origin rpy="0 0 0" xyz="0 0 0.57"/>
+    <origin rpy="0 0 0" xyz="0 0 0.37"/>
     <axis xyz="0 0 0"/>
     <parent link="utorso"/>
     <child link="chest"/>
