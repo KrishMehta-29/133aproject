@@ -26,6 +26,7 @@ setup(
         'console_scripts': [
             'pushup = 133aproject.pushup:main',
             'pushup_full = 133aproject.pushup_full:main',
+            'left_hand_x_y = 133aproject.left_hand_x_y:main',
         ],
     },
 )

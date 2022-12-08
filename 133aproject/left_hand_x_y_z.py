@@ -213,7 +213,7 @@ class Trajectory():
         self.period = 2
     
         leftLegPos = (np.array([-0.704, 0.115, 0.0085]).reshape((-1, 1)), R_from_quat(np.array([0.8892, 0, 0.4573, 0])))
-        leftArmPos = (np.array([0.704, 0.526, 0.00474]).reshape((-1, 1)), R_from_quat(np.array([0.583, -0.399, 0.399, -0.583])))
+        leftArmPos = (np.array([0.704, 0.626, 0.07474]).reshape((-1, 1)), R_from_quat(np.array([0.583, -0.399, 0.399, -0.583])))
         rightLegPos = (np.array([-0.704, -0.115, 0.0085]).reshape((-1, 1)), R_from_quat(np.array([0.8892, 0, 0.4573, 0])))
         rightArmPos = (np.array([0.704, -0.526, 0.0047]).reshape((-1, 1)), R_from_quat(np.array([0.583, 0.399, 0.399, 0.583])))
         chestPos = self.chest_pos(t, self.period) # changing
