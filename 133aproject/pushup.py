@@ -200,7 +200,7 @@ class Trajectory():
     
     def chest_pos(self, t, period):
     	# add explicit length of pushup 
-        s = 0.2 * np.cos((np.pi/period)* t)
+        s = 0.23 * np.cos((np.pi/period)* t)
         orient = R_from_quat(np.array([0.889, 0, 0.4573, 0]))
         return (np.array([0.4661, 0, 0.8587 - 0.3 + s]).reshape((-1,1)), orient)
     
