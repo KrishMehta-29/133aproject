@@ -54,6 +54,8 @@ class Q:
 
 class M(Q):
     def getMatrix(self, joint_names):
+        print("here")
+        print(len(joint_names))
         return np.diag(np.array([self.joint_values[name] for name in joint_names]))
 
 class Jacobian():
@@ -140,6 +142,7 @@ class Trajectory():
         self.Qdot.setAll(0)
         self.Q.setAll(0)
         self.Q.setSome(['r_arm_shx', 'l_arm_shx', 'r_arm_shz', 'l_arm_shz', 'rotate_y', 'mov_z'], np.array([0.25, -0.25, np.pi/2, -np.pi/2, 0.95, 0.51]))
+        # self.Q.setSome(['r_arm_shx', 'l_arm_shx', 'r_arm_shz', 'l_arm_shz', 'mov_z'], np.array([0.25, -0.25, np.pi/2, -np.pi/2, 0.51]))
         
         self.chain_left_arm.setjoints(self.Q.retSome(self.jointnames('left_arm')))
         self.chain_right_arm.setjoints(self.Q.retSome(self.jointnames('right_arm')))
@@ -155,13 +158,15 @@ class Trajectory():
         self.M.setAll(1)
         
         # Also zero the task error.
-        self.err = np.zeros((30, 1))
+        self.err = np.zeros((28, 1))
 
         # Pick the convergence bandwidth.
         self.lam = 30
         self.X = X()
 
-        self.Bounds = [SetBounds(-2.35, 0, 'r_arm_elx'), SetBounds(0, 2.35, 'l_arm_elx'), SetBounds(0, 3.14, 'r_arm_ely'), SetBounds(0, 3.14, 'l_arm_ely')]
+        # self.Bounds = [SetBounds(-2.35, 0, 'r_arm_ely'), SetBounds(0, 2.35, 'l_arm_ely'), SetBounds(0, 3.14, 'r_arm_ely'), SetBounds(0, 3.14, 'l_arm_ely')]
+        
+        self.Bounds = [SetBounds(-0.01, 0, 'r_arm_ely'), SetBounds(0, 0.01, 'l_arm_ely')]
 
     # Declare the joint names.
     def jointnames(self, which_chain='all'):
@@ -192,30 +197,10 @@ class Trajectory():
             return joints['world_chest']
              
         return joints['world_pelvis'] + joints[which_chain]
-        
-    def quat_to_angle(self, quat):
-        q0 = quat[0]
-        q1 = quat[1]
-        q2 = quat[2]
-        q3 = quat[3]
-        
-        r00 = 2 * (q0 ** 2 + q1**2) - 1
-        r01 = 2*(q1*q2 - q0*q3)
-        r02 = 2*(q1*q3 + q0*q2)
-        
-        r10 = 2*(q1*q2 + q0*q3)
-        r11 = 2*(q0**2 + q2**2) - 1
-        r12 = 2*(q2*q3 - q0*q1)
-        
-        r20 = 2*(q1*q3 - q0*q2)
-        r21 = 2*(q2*q3 + q0*q1)
-        r22 = 2*(q0**2 + q3**3) - 1
-        
-        return np.array([[r00, r01, r02], [r10, r11, r12], [r20, r21, r22]])
     
     def chest_pos(self, t, period):
     	# add explicit length of pushup 
-        s = 0.3 * np.cos((np.pi/period)* t)
+        s = 0.2 * np.cos((np.pi/period)* t)
         orient = R_from_quat(np.array([0.889, 0, 0.4573, 0]))
         return (np.array([0.4661, 0, 0.8587 - 0.3 + s]).reshape((-1,1)), orient)
     
@@ -233,6 +218,7 @@ class Trajectory():
         rightArmPos = (np.array([0.704, -0.226, 0.0047]).reshape((-1, 1)), R_from_quat(np.array([0.583, 0.399, 0.399, 0.583])))
         chestPos = self.chest_pos(t, self.period) # changing
         
+        
         # Grab the last joint value and task error.
         
         q = self.Q.retAll()
@@ -245,17 +231,21 @@ class Trajectory():
         J_left_leg = Jacobian(self.jointnames('left_leg'), self.chain_left_leg)
         J_right_leg = Jacobian(self.jointnames('right_leg'), self.chain_right_leg)
         J_chest = Jacobian(self.jointnames('world_chest'), self.chain_world_chest)
+        # J_pelvis = Jacobian(self.jointnames('world_pelvis'), self.chain_world_pelvis)
 
         JMerged = Jacobian.merge([J_left_arm, J_right_arm, J_left_leg, J_right_leg, J_chest], self.jointnames())
-
-        xdot = np.zeros((30, 1))
+        # JMerged = Jacobian.merge([J_left_arm, J_right_arm, J_left_leg, J_right_leg], self.jointnames())
+        xdot = np.zeros((28, 1))
+        JMerged = np.vstack((JMerged[:24], JMerged[26:, :]))
+        # JMerged = np.vstack((JMerged[:26], JMerged[29:, :]))
+        # xdot[22:25, :] = self.chest_vel(t, self.period)[0]
         xdot[24:27, :] = self.chest_vel(t, self.period)[0]
         
         M = self.M.getMatrix(self.jointnames())
+        self.M.setSome(['back_bkz', 'back_bky', 'back_bkx', 'l_leg_hpz', 'l_leg_hpx', 'l_leg_hpy', 'l_leg_kny', 'r_leg_hpz', 'r_leg_hpx', 'r_leg_hpy', 'r_leg_kny', 'mov_x', 'mov_y', 'mov_z', 'l_arm_shx', 'r_arm_shx'], [5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 0.1, 0.1, 0.1, 5, 5])
         MSI = np.linalg.inv(M @ M) # M squared inverse
-        JInv = MSI @ JMerged.T @ np.linalg.inv(JMerged @ MSI @ JMerged.T + self.gamma**2 * np.eye(30))
+        JInv = MSI @ JMerged.T @ np.linalg.inv(JMerged @ MSI @ JMerged.T + self.gamma**2 * np.eye(28))
         qdot = JInv @ (xdot + self.lam * err)
-
         # Integrate the joint position and update the kin chain data.
         qsec = Q(self.jointnames())
         qsec.setSome(self.jointnames(), q)
@@ -281,7 +271,7 @@ class Trajectory():
         self.chain_right_arm.setjoints(self.Q.retSome(self.jointnames('right_arm')))
         self.chain_left_leg.setjoints(self.Q.retSome(self.jointnames('left_leg')))
         self.chain_right_leg.setjoints(self.Q.retSome(self.jointnames('right_leg')))
-        #self.chain_world_pelvis.setjoints(self.Q.retSome(self.jointnames('world_pelvis')))
+        # self.chain_world_pelvis.setjoints(self.Q.retSome(self.jointnames('world_pelvis')))
         self.chain_world_chest.setjoints(self.Q.retSome(self.jointnames('world_chest')))
         
         # Compute the resulting task error (to be used next cycle).
@@ -290,7 +280,7 @@ class Trajectory():
         tipPositions = [(c.ptip(), c.Rtip()) for c in chains]
 
         err = self.X.calculateError(tipPositions, [leftArmPos, rightArmPos, leftLegPos, rightLegPos, chestPos])
-        # err = np.zeros((24, 1))
+        err = np.vstack((err[:24], err[26:, :]))
 
 
         # Save the joint value and task error for the next cycle.
@@ -303,7 +293,7 @@ class Trajectory():
         qdot_all = self.Qdot.retAll()
 
         wristValues = self.Q.retSome(['l_arm_ely', 'l_arm_elx', 'r_arm_ely', 'r_arm_elx'])
-        print(f"Wrist Values: Left, Right {wristValues}")
+        #print(f"Wrist Values: Left, Right {wristValues}")
 
         self.Q_still = Q(self.jointnames())
         self.Qdot_still = Q(self.jointnames())
@@ -312,8 +302,8 @@ class Trajectory():
         self.Q_still.setAll(0.0)
         self.Q_still.setSome(['r_arm_shx', 'l_arm_shx', 'r_arm_shz', 'l_arm_shz', 'rotate_y', 'mov_z'], np.array([0.25, -0.25, np.pi/2, -np.pi/2, 0.95, 0.51]))
     
-        # q_all = self.Q_still.retAll()
-        # qdot_all = self.Qdot_still.retAll()
+        #q_all = self.Q_still.retAll()
+        #qdot_all = self.Qdot_still.retAll()
         
         return (q_all.flatten().tolist(), qdot_all.flatten().tolist())
 
